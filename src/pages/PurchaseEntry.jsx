@@ -20,6 +20,7 @@ import {
   X,
   FileText,
 } from 'lucide-react';
+import Modal from '../components/Modal';
 
 const particularOptions = [
   '20 SKY SHOT',
@@ -61,6 +62,7 @@ const PurchaseEntry = () => {
     products: contextProducts = [],
     getCustomerRemainingAdvance = () => 0,
     getCustomerTotalAdvance = () => 0,
+    addCustomer,
     addAdvancePayment,
     selectedCustomerIdForStatement,
     targetPerformoTab,
@@ -75,17 +77,27 @@ const PurchaseEntry = () => {
 
   useEffect(() => {
     if (contextCustomers && contextCustomers.length > 0) {
-      setCustomersList(
-        contextCustomers.map((c) => ({
-          id: c.customId || c.id || c._id,
-          name: c.name,
-          phone: c.phone || '9876543210',
-          gst: c.gst || 'N/A',
-          address: c.address || 'Delivery Address Not Specified',
-          debit: c.debit || stockContext?.getCustomerTotalPurchases(c.id) || 0,
-          credit: c.credit || stockContext?.getCustomerTotalAdvance(c.id) || 0,
-        }))
-      );
+      const mapped = contextCustomers.map((c) => ({
+        id: c.customId || c.id || c._id,
+        mongoId: c._id || c.id,
+        name: c.name,
+        phone: c.phone || '9876543210',
+        gst: c.gst || 'N/A',
+        address: c.address || 'Delivery Address Not Specified',
+        debit: c.debit || stockContext?.getCustomerTotalPurchases?.(c.id) || 0,
+        credit: c.credit || stockContext?.getCustomerTotalAdvance?.(c.id) || 0,
+      }));
+      setCustomersList(mapped);
+
+      // Ensure selectedCustomerId is pointing to an existing customer in the live list
+      setSelectedCustomerId((prevId) => {
+        if (prevId && mapped.some((m) => m.id === prevId)) {
+          return prevId;
+        }
+        return mapped[0]?.id || '';
+      });
+    } else {
+      setCustomersList([]);
     }
   }, [contextCustomers]);
 
@@ -168,6 +180,82 @@ const PurchaseEntry = () => {
   const [purchaseDate, setPurchaseDate] = useState('2026-09-17');
   const [customerAdvanceInput, setCustomerAdvanceInput] = useState('');
 
+  // Auto-sync customer name & advance input when selectedCustomerId or customersList changes
+  useEffect(() => {
+    if (selectedCustomerId && customersList.length > 0) {
+      const cust = customersList.find((c) => c.id === selectedCustomerId);
+      if (cust) {
+        setStep2Customer(cust.name);
+        const adv = getCustomerTotalAdvance(cust.id);
+        setCustomerAdvanceInput(adv ? adv.toString() : '');
+      }
+    }
+  }, [selectedCustomerId, customersList]);
+
+  // Quick Add Customer Modal State inside Performo
+  const [isAddCustomerModalOpen, setIsAddCustomerModalOpen] = useState(false);
+  const [newCustomerForm, setNewCustomerForm] = useState({
+    name: '',
+    phone: '',
+    gst: '',
+    address: '',
+    advanceAmount: '',
+  });
+
+  const handleQuickAddCustomer = async (e) => {
+    e.preventDefault();
+    if (!newCustomerForm.name.trim() || !newCustomerForm.phone.trim()) {
+      alert('Please enter customer Name and Phone Number.');
+      return;
+    }
+
+    const initAdv = parseFloat(newCustomerForm.advanceAmount) || 0;
+    const payload = {
+      name: newCustomerForm.name.trim().toUpperCase(),
+      phone: newCustomerForm.phone.trim(),
+      gst: newCustomerForm.gst ? newCustomerForm.gst.trim().toUpperCase() : 'N/A',
+      address: newCustomerForm.address ? newCustomerForm.address.trim().toUpperCase() : 'N/A',
+      credit: initAdv,
+      debit: 0,
+    };
+
+    let created;
+    if (addCustomer) {
+      created = await addCustomer(payload);
+    }
+
+    const createdId = created?.customId || created?.id || created?._id || `CUST-${Date.now()}`;
+
+    if (initAdv > 0 && addAdvancePayment && created) {
+      await addAdvancePayment({
+        customerId: createdId,
+        customerName: payload.name,
+        amount: initAdv,
+        date: purchaseDate || new Date().toISOString().split('T')[0],
+        paymentReference: `PAY-${Math.floor(1000 + Math.random() * 9000)}`,
+        paymentMethod: 'Cash',
+      });
+    }
+
+    setSelectedCustomerId(createdId);
+    setStep2Customer(payload.name);
+    setCustomerAdvanceInput(initAdv ? initAdv.toString() : '');
+
+    setNewCustomerForm({
+      name: '',
+      phone: '',
+      gst: '',
+      address: '',
+      advanceAmount: '',
+    });
+    setIsAddCustomerModalOpen(false);
+
+    setFeedback({
+      type: 'success',
+      message: `Customer "${payload.name}" added successfully and selected!`,
+    });
+  };
+
   // Step 2 Item Entry Row State
   const [entryParticular, setEntryParticular] = useState('');
   const [entryCase, setEntryCase] = useState('');
@@ -177,7 +265,7 @@ const PurchaseEntry = () => {
   const [editingRowIndex, setEditingRowIndex] = useState(null);
 
   // Step 2 Billing & Customer Form Controls State
-  const [step2Customer, setStep2Customer] = useState('SAI MOHAN M...');
+  const [step2Customer, setStep2Customer] = useState('');
   const [step2CaseCount, setStep2CaseCount] = useState('0');
   const [step2Company, setStep2Company] = useState('SIMBA FW');
   const [step2Discount, setStep2Discount] = useState('');
@@ -684,9 +772,18 @@ const PurchaseEntry = () => {
           {/* Row 1: Select Customer & Purchase Date & Live Remaining Advance */}
           <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
             <div className="md:col-span-5">
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                Customer Account <span className="text-rose-500">*</span>
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Customer Account <span className="text-rose-500">*</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setIsAddCustomerModalOpen(true)}
+                  className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer bg-blue-50 hover:bg-blue-100 px-2.5 py-0.5 rounded-lg transition-colors"
+                >
+                  <Plus size={13} /> Add Customer
+                </button>
+              </div>
               <select
                 value={selectedCustomerId}
                 onChange={(e) => {
@@ -703,11 +800,15 @@ const PurchaseEntry = () => {
                 }}
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 cursor-pointer shadow-xs"
               >
-                {customersList.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name} ({c.phone})
-                  </option>
-                ))}
+                {customersList.length === 0 ? (
+                  <option value="">No customers found - Click + Add Customer</option>
+                ) : (
+                  customersList.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} ({c.phone || c.id})
+                    </option>
+                  ))
+                )}
               </select>
             </div>
 
@@ -1795,6 +1896,110 @@ const PurchaseEntry = () => {
         </div>
       </section>
       )}
+      {/* ── Quick Add Customer Modal ── */}
+      <Modal
+        isOpen={isAddCustomerModalOpen}
+        onClose={() => setIsAddCustomerModalOpen(false)}
+        title="Add New Customer"
+      >
+        <form onSubmit={handleQuickAddCustomer} className="space-y-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+              Customer / Business Name <span className="text-rose-500">*</span>
+            </label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. SRI RAM FIREWORKS"
+              value={newCustomerForm.name}
+              onChange={(e) =>
+                setNewCustomerForm({ ...newCustomerForm, name: e.target.value })
+              }
+              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                Phone Number <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="tel"
+                required
+                placeholder="e.g. 9876543210"
+                value={newCustomerForm.phone}
+                onChange={(e) =>
+                  setNewCustomerForm({ ...newCustomerForm, phone: e.target.value })
+                }
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                GST Number
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. 33AABCS1234L1Z5"
+                value={newCustomerForm.gst}
+                onChange={(e) =>
+                  setNewCustomerForm({ ...newCustomerForm, gst: e.target.value })
+                }
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 uppercase"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+              Address / Location
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. Sivakasi, Tamil Nadu"
+              value={newCustomerForm.address}
+              onChange={(e) =>
+                setNewCustomerForm({ ...newCustomerForm, address: e.target.value })
+              }
+              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+              Opening / Advance Amount (₹)
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              placeholder="e.g. 50000"
+              value={newCustomerForm.advanceAmount}
+              onChange={(e) =>
+                setNewCustomerForm({ ...newCustomerForm, advanceAmount: e.target.value })
+              }
+              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-emerald-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+            />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={() => setIsAddCustomerModalOpen(false)}
+              className="px-4 py-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer"
+            >
+              Save Customer & Select
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

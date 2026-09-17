@@ -62,9 +62,15 @@ const getCustomers = async (req, res) => {
 
 const createCustomer = async (req, res) => {
   try {
-    const newCust = await Customer.create(req.body);
+    let customId = req.body.customId;
+    if (!customId) {
+      const count = await Customer.countDocuments();
+      customId = `CUST-${101 + count}`;
+    }
+    const newCust = await Customer.create({ ...req.body, customId });
     return res.status(201).json(newCust);
   } catch (error) {
+    console.error('Error in createCustomer:', error);
     const newCust = {
       _id: `CUST-${Date.now()}`,
       id: `CUST-${Date.now()}`,
@@ -78,10 +84,17 @@ const createCustomer = async (req, res) => {
 
 const updateCustomer = async (req, res) => {
   try {
-    const updated = await Customer.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    let updated;
+    const mongoose = require('mongoose');
+    if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+      updated = await Customer.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    }
+    if (!updated) {
+      updated = await Customer.findOneAndUpdate({ customId: req.params.id }, req.body, { new: true });
+    }
     if (updated) return res.status(200).json(updated);
   } catch (error) {
-    // fallback
+    console.error('Error in updateCustomer:', error);
   }
   const idx = memoryCustomers.findIndex(c => c._id === req.params.id || c.id === req.params.id);
   if (idx !== -1) {
@@ -93,9 +106,17 @@ const updateCustomer = async (req, res) => {
 
 const deleteCustomer = async (req, res) => {
   try {
-    await Customer.findByIdAndDelete(req.params.id);
+    const mongoose = require('mongoose');
+    let deleted;
+    if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+      deleted = await Customer.findByIdAndDelete(req.params.id);
+    }
+    if (!deleted) {
+      deleted = await Customer.findOneAndDelete({ customId: req.params.id });
+    }
+    return res.status(200).json({ message: 'Customer deleted successfully' });
   } catch (error) {
-    // fallback
+    console.error('Error in deleteCustomer:', error);
   }
   memoryCustomers = memoryCustomers.filter(c => c._id !== req.params.id && c.id !== req.params.id);
   res.status(200).json({ message: 'Customer deleted successfully' });

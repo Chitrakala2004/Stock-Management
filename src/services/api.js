@@ -26,7 +26,9 @@ export const productService = {
 
 export const brandService = {
   getAll: () => api.get('/brands'),
-  create: (name) => api.post('/brands', { name }),
+  create: (data) => api.post('/brands', typeof data === 'string' ? { name: data } : data),
+  update: (id, data) => api.put(`/brands/${id}`, data),
+  delete: (id) => api.delete(`/brands/${id}`),
 };
 
 export const purchaseService = {

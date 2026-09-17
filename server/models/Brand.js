@@ -8,6 +8,14 @@ const brandSchema = new mongoose.Schema(
       unique: true,
       trim: true,
     },
+    address: {
+      type: String,
+      default: 'Sivakasi, Tamil Nadu',
+    },
+    gst: {
+      type: String,
+      default: 'N/A',
+    },
     description: {
       type: String,
     },

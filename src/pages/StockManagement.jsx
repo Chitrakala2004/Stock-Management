@@ -53,7 +53,7 @@ const StockManagement = () => {
   // Form states
   const [newBrandName, setNewBrandName] = useState('');
   const [productForm, setProductForm] = useState({
-    brand: brands[0] || 'Standard Crackers',
+    brand: (typeof brands[0] === 'string' ? brands[0] : brands[0]?.name) || 'Standard Crackers',
     name: '',
     category: 'Flower Pots',
     image: '',
@@ -73,9 +73,11 @@ const StockManagement = () => {
     setProductForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleAddBrandSubmit = (e) => {
+  const handleAddBrandSubmit = async (e) => {
     e.preventDefault();
-    if (addBrand(newBrandName)) {
+    if (!newBrandName.trim()) return;
+    const result = await addBrand(newBrandName.trim());
+    if (result) {
       setProductForm((prev) => ({ ...prev, brand: newBrandName.trim() }));
       setNewBrandName('');
       setIsAddBrandOpen(false);
@@ -84,13 +86,13 @@ const StockManagement = () => {
     }
   };
 
-  const handleAddProductSubmit = (e) => {
+  const handleAddProductSubmit = async (e) => {
     e.preventDefault();
     if (!productForm.name || !productForm.pricePerPiece || !productForm.piecesPerCase) return;
 
-    addProduct(productForm);
+    await addProduct(productForm);
     setProductForm({
-      brand: brands[0] || 'Standard Crackers',
+      brand: (typeof brands[0] === 'string' ? brands[0] : brands[0]?.name) || 'Standard Crackers',
       name: '',
       category: 'Flower Pots',
       image: '',
@@ -209,9 +211,12 @@ const StockManagement = () => {
               className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-700 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
             >
               <option value="All">All Brands ({brands.length})</option>
-              {brands.map((b) => (
-                <option key={b} value={b}>{b}</option>
-              ))}
+              {brands.map((b) => {
+                const name = typeof b === 'string' ? b : b.name;
+                return (
+                  <option key={b.id || name} value={name}>{name}</option>
+                );
+              })}
             </select>
 
             {/* Category Filter */}
@@ -399,9 +404,12 @@ const StockManagement = () => {
                   onChange={handleProductInputChange}
                   className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
                 >
-                  {brands.map((b) => (
-                    <option key={b} value={b}>{b}</option>
-                  ))}
+                  {brands.map((b) => {
+                    const name = typeof b === 'string' ? b : b.name;
+                    return (
+                      <option key={b.id || name} value={name}>{name}</option>
+                    );
+                  })}
                 </select>
               </div>
 

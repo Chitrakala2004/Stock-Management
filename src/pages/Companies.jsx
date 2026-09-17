@@ -12,17 +12,17 @@ import {
 import Modal from '../components/Modal';
 
 const Companies = () => {
-  const { brands = [], addBrand } = useStock();
+  const { brands = [], addBrand, updateBrand, deleteBrand } = useStock();
   const [companies, setCompanies] = useState([]);
 
   useEffect(() => {
     if (brands && brands.length > 0) {
       setCompanies(
         brands.map((b, idx) => ({
-          id: b.id || b._id || idx + 1,
+          id: b._id || b.id || idx + 1,
           name: typeof b === 'string' ? b : b.name,
-          address: b.address || 'Sivakasi, Tamil Nadu',
-          gst: b.gst || '33AABCS1234L1Z5',
+          address: (typeof b === 'object' && b.address) ? b.address : 'Sivakasi, Tamil Nadu',
+          gst: (typeof b === 'object' && b.gst) ? b.gst : 'N/A',
         }))
       );
     } else {
@@ -46,18 +46,20 @@ const Companies = () => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleAddCompany = (e) => {
+  const handleAddCompany = async (e) => {
     e.preventDefault();
     if (!formData.name) return;
 
-    const newCompany = {
-      id: Date.now(),
+    const payload = {
       name: formData.name.toUpperCase(),
-      address: formData.address || 'N/A',
+      address: formData.address || 'Sivakasi, Tamil Nadu',
       gst: formData.gst ? formData.gst.toUpperCase() : 'N/A',
     };
 
-    setCompanies([newCompany, ...companies]);
+    if (addBrand) {
+      await addBrand(payload);
+    }
+
     setFormData({ name: '', address: '', gst: '' });
     setIsAddModalOpen(false);
   };
@@ -72,20 +74,23 @@ const Companies = () => {
     setIsEditModalOpen(true);
   };
 
-  const handleUpdateCompany = (e) => {
+  const handleUpdateCompany = async (e) => {
     e.preventDefault();
     if (!editingCompany || !formData.name) return;
 
+    const updatePayload = {
+      name: formData.name.toUpperCase(),
+      address: formData.address,
+      gst: formData.gst.toUpperCase(),
+    };
+
+    if (updateBrand) {
+      await updateBrand(editingCompany.id, updatePayload);
+    }
+
     setCompanies(
       companies.map((c) =>
-        c.id === editingCompany.id
-          ? {
-              ...c,
-              name: formData.name.toUpperCase(),
-              address: formData.address,
-              gst: formData.gst.toUpperCase(),
-            }
-          : c
+        c.id === editingCompany.id ? { ...c, ...updatePayload } : c
       )
     );
 
@@ -93,8 +98,11 @@ const Companies = () => {
     setEditingCompany(null);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this company?')) {
+      if (deleteBrand) {
+        await deleteBrand(id);
+      }
       setCompanies(companies.filter((c) => c.id !== id));
     }
   };
