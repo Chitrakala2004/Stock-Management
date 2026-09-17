@@ -2,117 +2,96 @@ import { useState } from 'react';
 import {
   Search,
   Plus,
+  Printer,
   Edit3,
   Trash2,
-  Eye,
-  Download,
-  User,
   Phone,
-  Mail,
-  IndianRupee,
-  Calendar,
   CreditCard,
-  ArrowUpRight,
-  ArrowDownLeft,
-  Package,
-  Send,
-  AlertCircle,
+  Wallet,
+  FileText,
+  Building2,
   CheckCircle2,
-  Boxes,
+  AlertCircle,
+  X,
+  Send,
+  Download,
+  IndianRupee,
 } from 'lucide-react';
 import Modal from '../components/Modal';
 
 const initialCustomers = [
   {
-    id: 1,
-    name: 'Rajesh Kumar (Sri Sai Traders)',
-    phone: '9876543210',
+    id: '#0007',
+    name: 'SAI MOHAN MARKETING',
+    gst: '22ADWPN7742F1Z7',
+    address: 'CHHATTISGARH',
+    phone: '86020 05900',
+    debit: 307506.00,
+    credit: 307500.00,
+    email: 'saimohan@marketing.com',
+  },
+  {
+    id: '#0001',
+    name: 'SRI SAI TRADERS',
+    gst: '33AAACR1234F1Z1',
+    address: 'TAMIL NADU',
+    phone: '98765 43210',
+    debit: 150000.00,
+    credit: 150000.00,
     email: 'rajesh@saisai.com',
-    advancePaid: 50000,
-    advanceBalance: 22000, // ₹50k paid - ₹28k dispatched = ₹22k remaining
-    bookedCases: 50,
-    dispatchedCases: 28,
-    remainingCases: 22,
-    status: 'Active',
-    joined: '2024-08-15',
   },
   {
-    id: 2,
-    name: 'Sunita Sharma (Sharma Crackers)',
-    phone: '9845612370',
+    id: '#0002',
+    name: 'SHARMA CRACKERS STORE',
+    gst: '27AABCS5678G2Z3',
+    address: 'MAHARASHTRA',
+    phone: '98456 12370',
+    debit: 225000.00,
+    credit: 200000.00,
     email: 'sunita@sharmacrackers.in',
-    advancePaid: 100000,
-    advanceBalance: 35000, // ₹100k paid - ₹65k dispatched = ₹35k remaining
-    bookedCases: 120,
-    dispatchedCases: 80,
-    remainingCases: 40,
-    status: 'Active',
-    joined: '2024-08-20',
   },
   {
-    id: 3,
-    name: 'Meena Stores',
-    phone: '9123456790',
+    id: '#0003',
+    name: 'MEENA STORES & FIREWORKS',
+    gst: '36AAAFM9012H1Z5',
+    address: 'TELANGANA',
+    phone: '91234 56790',
+    debit: 85000.00,
+    credit: 85000.00,
     email: 'meena@stores.com',
-    advancePaid: 75000,
-    advanceBalance: 15000,
-    bookedCases: 80,
-    dispatchedCases: 65,
-    remainingCases: 15,
-    status: 'Active',
-    joined: '2024-08-25',
   },
   {
-    id: 4,
-    name: 'Priya Enterprises (Deepavali Mart)',
-    phone: '9988776655',
+    id: '#0004',
+    name: 'DEEPAVALI MART ENTERPRISES',
+    gst: '29AAACD3456J1Z8',
+    address: 'KARNATAKA',
+    phone: '99887 76655',
+    debit: 420000.00,
+    credit: 400000.00,
     email: 'priya@deepavalimart.com',
-    advancePaid: 150000,
-    advanceBalance: 90000,
-    bookedCases: 150,
-    dispatchedCases: 60,
-    remainingCases: 90,
-    status: 'Active',
-    joined: '2024-09-01',
-  },
-  {
-    id: 5,
-    name: 'Amit & Sons Crackers',
-    phone: '9765432109',
-    email: 'amit@sons.com',
-    advancePaid: 30000,
-    advanceBalance: 0,
-    bookedCases: 30,
-    dispatchedCases: 30,
-    remainingCases: 0,
-    status: 'Completed',
-    joined: '2024-07-10',
   },
 ];
 
 const customerTransactionsMap = {
-  1: [
-    { date: '2024-09-14', ref: 'DSP-2024-089', desc: 'Dispatched 10 Cases (Sparklers & Ground Chakkars)', type: 'dispatch', casesSent: 10, amount: 12000, remainingCases: 22, remainingAdvance: 22000 },
-    { date: '2024-09-10', ref: 'DSP-2024-045', desc: 'Dispatched 18 Cases (Rockets & Multi-shot Aerial)', type: 'dispatch', casesSent: 18, amount: 16000, remainingCases: 32, remainingAdvance: 34000 },
-    { date: '2024-08-15', ref: 'ADV-2024-012', desc: 'Advance Amount Received via UPI', type: 'advance', casesSent: 0, amount: 50000, remainingCases: 50, remainingAdvance: 50000 },
+  '#0007': [
+    { date: '2024-09-15', ref: 'INV-2024-098', desc: 'Crackers Purchase (Ground Chakkars & Sparklers)', type: 'debit', amount: 307506.00 },
+    { date: '2024-09-10', ref: 'PAY-2024-045', desc: 'Advance Payment Received via NEFT', type: 'credit', amount: 307500.00 },
   ],
-  2: [
-    { date: '2024-09-12', ref: 'DSP-2024-072', desc: 'Dispatched 30 Cases (Flower Pots & Gift Boxes)', type: 'dispatch', casesSent: 30, amount: 25000, remainingCases: 40, remainingAdvance: 35000 },
-    { date: '2024-09-05', ref: 'DSP-2024-031', desc: 'Dispatched 50 Cases (Sparklers & Atom Bombs)', type: 'dispatch', casesSent: 50, amount: 40000, remainingCases: 70, remainingAdvance: 60000 },
-    { date: '2024-08-20', ref: 'ADV-2024-008', desc: 'Advance Booking Payment Received (NEFT)', type: 'advance', casesSent: 0, amount: 100000, remainingCases: 120, remainingAdvance: 100000 },
+  '#0001': [
+    { date: '2024-09-12', ref: 'INV-2024-080', desc: 'Standard Fireworks Cases Purchase', type: 'debit', amount: 150000.00 },
+    { date: '2024-09-01', ref: 'PAY-2024-012', desc: 'Full Payment via UPI', type: 'credit', amount: 150000.00 },
   ],
-  3: [
-    { date: '2024-09-11', ref: 'DSP-2024-065', desc: 'Dispatched 25 Cases (Mixed Crackers Carton)', type: 'dispatch', casesSent: 25, amount: 25000, remainingCases: 15, remainingAdvance: 15000 },
-    { date: '2024-09-02', ref: 'DSP-2024-018', desc: 'Dispatched 40 Cases (Electric Crackers & Bombs)', type: 'dispatch', casesSent: 40, amount: 35000, remainingCases: 40, remainingAdvance: 40000 },
-    { date: '2024-08-25', ref: 'ADV-2024-015', desc: 'Advance Booking Payment Received (Cash)', type: 'advance', casesSent: 0, amount: 75000, remainingCases: 80, remainingAdvance: 75000 },
+  '#0002': [
+    { date: '2024-09-14', ref: 'INV-2024-092', desc: 'Gift Boxes & Aerial Fountain Stock', type: 'debit', amount: 225000.00 },
+    { date: '2024-09-05', ref: 'PAY-2024-030', desc: 'Part Payment via Bank Transfer', type: 'credit', amount: 200000.00 },
   ],
-  4: [
-    { date: '2024-09-15', ref: 'DSP-2024-095', desc: 'Dispatched 60 Cases (Family Gift Packs & Fountains)', type: 'dispatch', casesSent: 60, amount: 60000, remainingCases: 90, remainingAdvance: 90000 },
-    { date: '2024-09-01', ref: 'ADV-2024-022', desc: 'Advance Booking Payment Received (Bank Transfer)', type: 'advance', casesSent: 0, amount: 150000, remainingCases: 150, remainingAdvance: 150000 },
+  '#0003': [
+    { date: '2024-09-10', ref: 'INV-2024-071', desc: 'Mixed Cartons Stock Order', type: 'debit', amount: 85000.00 },
+    { date: '2024-09-02', ref: 'PAY-2024-015', desc: 'Cash Payment Received', type: 'credit', amount: 85000.00 },
   ],
-  5: [
-    { date: '2024-08-10', ref: 'DSP-2024-010', desc: 'Dispatched 30 Cases (Full Order Fulfilled)', type: 'dispatch', casesSent: 30, amount: 30000, remainingCases: 0, remainingAdvance: 0 },
-    { date: '2024-07-10', ref: 'ADV-2024-001', desc: 'Advance Booking Received', type: 'advance', casesSent: 0, amount: 30000, remainingCases: 30, remainingAdvance: 30000 },
+  '#0004': [
+    { date: '2024-09-16', ref: 'INV-2024-101', desc: 'Family Pack Cartons & Rockets Order', type: 'debit', amount: 420000.00 },
+    { date: '2024-09-08', ref: 'PAY-2024-052', desc: 'Advance Transfer Received', type: 'credit', amount: 400000.00 },
   ],
 };
 
@@ -120,333 +99,420 @@ const Customers = () => {
   const [customers, setCustomers] = useState(initialCustomers);
   const [transactions, setTransactions] = useState(customerTransactionsMap);
   const [search, setSearch] = useState('');
-  const [filterStatus, setFilterStatus] = useState('All');
-  
+
   // Modals
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isDispatchModalOpen, setIsDispatchModalOpen] = useState(false);
-  const [selectedCustomer, setSelectedCustomer] = useState(null);
-  const [dispatchCustomer, setDispatchCustomer] = useState(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isLedgerModalOpen, setIsLedgerModalOpen] = useState(false);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
 
-  // Add Customer Form
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [editCustomer, setEditCustomer] = useState(null);
+
+  // Forms
   const [formData, setFormData] = useState({
     name: '',
+    gst: '',
+    address: '',
     phone: '',
     email: '',
-    advancePaid: '',
-    bookedCases: '',
-    status: 'Active',
+    debit: '',
+    credit: '',
   });
 
-  // Dispatch Form
-  const [dispatchData, setDispatchData] = useState({
-    casesSent: '',
-    billAmount: '',
+  const [paymentForm, setPaymentForm] = useState({
+    type: 'credit', // 'credit' (Payment received) or 'debit' (New purchase)
+    amount: '',
+    paymentMethod: 'UPI',
+    ref: '',
     desc: '',
   });
+
+  const formatCurrency = (val) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 2,
+    }).format(val);
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleDispatchInputChange = (e) => {
-    const { name, value } = e.target;
-    setDispatchData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  // Add New Customer & Advance Booking
+  // Add Customer Submit
   const handleAddCustomer = (e) => {
     e.preventDefault();
-    if (!formData.name || !formData.phone || !formData.advancePaid || !formData.bookedCases) return;
+    if (!formData.name || !formData.phone) return;
 
-    const today = new Date().toISOString().split('T')[0];
-    const adv = parseFloat(formData.advancePaid) || 0;
-    const cases = parseInt(formData.bookedCases, 10) || 0;
-    const newId = Date.now();
+    const nextNumber = customers.length + 1;
+    const newId = `#${String(nextNumber).padStart(4, '0')}`;
+    const debitVal = parseFloat(formData.debit) || 0;
+    const creditVal = parseFloat(formData.credit) || 0;
 
     const newCust = {
       id: newId,
-      name: formData.name,
+      name: formData.name.toUpperCase(),
+      gst: formData.gst ? formData.gst.toUpperCase() : 'N/A',
+      address: formData.address ? formData.address.toUpperCase() : 'N/A',
       phone: formData.phone,
-      email: formData.email || 'N/A',
-      advancePaid: adv,
-      advanceBalance: adv,
-      bookedCases: cases,
-      dispatchedCases: 0,
-      remainingCases: cases,
-      status: formData.status,
-      joined: today,
+      email: formData.email || '',
+      debit: debitVal,
+      credit: creditVal,
     };
 
-    const initTx = [
-      {
-        date: today,
-        ref: `ADV-${Math.floor(1000 + Math.random() * 9000)}`,
-        desc: `Advance Payment Received for ${cases} Cases`,
-        type: 'advance',
-        casesSent: 0,
-        amount: adv,
-        remainingCases: cases,
-        remainingAdvance: adv,
-      },
-    ];
+    const initialTx = [];
+    if (debitVal > 0) {
+      initialTx.push({
+        date: new Date().toISOString().split('T')[0],
+        ref: `INV-${Math.floor(1000 + Math.random() * 9000)}`,
+        desc: 'Opening Purchases / Debit',
+        type: 'debit',
+        amount: debitVal,
+      });
+    }
+    if (creditVal > 0) {
+      initialTx.push({
+        date: new Date().toISOString().split('T')[0],
+        ref: `PAY-${Math.floor(1000 + Math.random() * 9000)}`,
+        desc: 'Opening Payment / Credit',
+        type: 'credit',
+        amount: creditVal,
+      });
+    }
 
     setCustomers([newCust, ...customers]);
-    setTransactions((prev) => ({ ...prev, [newId]: initTx }));
-    setFormData({ name: '', phone: '', email: '', advancePaid: '', bookedCases: '', status: 'Active' });
+    if (initialTx.length > 0) {
+      setTransactions((prev) => ({ ...prev, [newId]: initialTx }));
+    }
+
+    setFormData({ name: '', gst: '', address: '', phone: '', email: '', debit: '', credit: '' });
     setIsAddModalOpen(false);
   };
 
-  // Open Dispatch Modal
-  const openDispatchModal = (cust, e) => {
+  // Open Edit Customer Modal
+  const openEditModal = (cust, e) => {
     if (e) e.stopPropagation();
-    setDispatchCustomer(cust);
-    setDispatchData({ casesSent: '', billAmount: '', desc: '' });
-    setIsDispatchModalOpen(true);
-  };
-
-  // Process Dispatch & Calculate Deductions
-  const handleProcessDispatch = (e) => {
-    e.preventDefault();
-    if (!dispatchCustomer) return;
-
-    const casesToSend = parseInt(dispatchData.casesSent, 10) || 0;
-    const amountToDeduct = parseFloat(dispatchData.billAmount) || 0;
-
-    if (casesToSend <= 0 || amountToDeduct <= 0) return;
-
-    const updatedCustomers = customers.map((c) => {
-      if (c.id === dispatchCustomer.id) {
-        const newDispatchedCases = c.dispatchedCases + casesToSend;
-        const newRemainingCases = Math.max(0, c.bookedCases - newDispatchedCases);
-        const newAdvanceBalance = Math.max(0, c.advanceBalance - amountToDeduct);
-        const newStatus = newRemainingCases === 0 ? 'Completed' : c.status;
-
-        return {
-          ...c,
-          dispatchedCases: newDispatchedCases,
-          remainingCases: newRemainingCases,
-          advanceBalance: newAdvanceBalance,
-          status: newStatus,
-        };
-      }
-      return c;
+    setEditCustomer(cust);
+    setFormData({
+      name: cust.name,
+      gst: cust.gst,
+      address: cust.address,
+      phone: cust.phone,
+      email: cust.email || '',
+      debit: cust.debit,
+      credit: cust.credit,
     });
-
-    const updatedCust = updatedCustomers.find((c) => c.id === dispatchCustomer.id);
-    const today = new Date().toISOString().split('T')[0];
-
-    const newDispatchTx = {
-      date: today,
-      ref: `DSP-${Math.floor(1000 + Math.random() * 9000)}`,
-      desc: dispatchData.desc || `Dispatched ${casesToSend} Cases of Crackers`,
-      type: 'dispatch',
-      casesSent: casesToSend,
-      amount: amountToDeduct,
-      remainingCases: updatedCust.remainingCases,
-      remainingAdvance: updatedCust.advanceBalance,
-    };
-
-    setCustomers(updatedCustomers);
-    setTransactions((prev) => ({
-      ...prev,
-      [dispatchCustomer.id]: [newDispatchTx, ...(prev[dispatchCustomer.id] || [])],
-    }));
-
-    if (selectedCustomer?.id === dispatchCustomer.id) {
-      setSelectedCustomer(updatedCust);
-    }
-
-    setIsDispatchModalOpen(false);
-    setDispatchCustomer(null);
+    setIsEditModalOpen(true);
   };
 
+  const handleUpdateCustomer = (e) => {
+    e.preventDefault();
+    if (!editCustomer) return;
+
+    setCustomers(
+      customers.map((c) =>
+        c.id === editCustomer.id
+          ? {
+              ...c,
+              name: formData.name.toUpperCase(),
+              gst: formData.gst.toUpperCase(),
+              address: formData.address.toUpperCase(),
+              phone: formData.phone,
+              email: formData.email,
+              debit: parseFloat(formData.debit) || 0,
+              credit: parseFloat(formData.credit) || 0,
+            }
+          : c
+      )
+    );
+
+    setIsEditModalOpen(false);
+    setEditCustomer(null);
+  };
+
+  // Delete Customer
   const handleDelete = (id, e) => {
-    e.stopPropagation();
-    if (window.confirm('Are you sure you want to delete this customer record?')) {
+    if (e) e.stopPropagation();
+    if (window.confirm('Are you sure you want to delete this customer entry?')) {
       setCustomers(customers.filter((c) => c.id !== id));
       if (selectedCustomer?.id === id) setSelectedCustomer(null);
     }
   };
 
-  const filtered = customers.filter((c) => {
-    const matchSearch =
+  // Open Payment/Credit Modal
+  const openPaymentModal = (cust, e) => {
+    if (e) e.stopPropagation();
+    setSelectedCustomer(cust);
+    setPaymentForm({
+      type: 'credit',
+      amount: '',
+      paymentMethod: 'UPI',
+      ref: '',
+      desc: '',
+    });
+    setIsPaymentModalOpen(true);
+  };
+
+  // Submit Payment/Credit or Debit Entry
+  const handlePaymentSubmit = (e) => {
+    e.preventDefault();
+    if (!selectedCustomer || !paymentForm.amount) return;
+
+    const amt = parseFloat(paymentForm.amount) || 0;
+    const isCredit = paymentForm.type === 'credit';
+    const today = new Date().toISOString().split('T')[0];
+
+    // Update customer debit/credit balance
+    setCustomers(
+      customers.map((c) => {
+        if (c.id === selectedCustomer.id) {
+          return {
+            ...c,
+            credit: isCredit ? c.credit + amt : c.credit,
+            debit: !isCredit ? c.debit + amt : c.debit,
+          };
+        }
+        return c;
+      })
+    );
+
+    // Add transaction entry
+    const newTx = {
+      date: today,
+      ref: paymentForm.ref || `${isCredit ? 'PAY' : 'INV'}-${Math.floor(1000 + Math.random() * 9000)}`,
+      desc: paymentForm.desc || (isCredit ? `Payment Received via ${paymentForm.paymentMethod}` : 'New Purchase Order'),
+      type: paymentForm.type,
+      amount: amt,
+    };
+
+    setTransactions((prev) => ({
+      ...prev,
+      [selectedCustomer.id]: [newTx, ...(prev[selectedCustomer.id] || [])],
+    }));
+
+    setIsPaymentModalOpen(false);
+  };
+
+  // Open Ledger Modal
+  const openLedgerModal = (cust, e) => {
+    if (e) e.stopPropagation();
+    setSelectedCustomer(cust);
+    setIsLedgerModalOpen(true);
+  };
+
+  // Print function
+  const handlePrintList = () => {
+    window.print();
+  };
+
+  // Search Filter
+  const filteredCustomers = customers.filter(
+    (c) =>
       c.name.toLowerCase().includes(search.toLowerCase()) ||
+      c.gst.toLowerCase().includes(search.toLowerCase()) ||
+      c.address.toLowerCase().includes(search.toLowerCase()) ||
       c.phone.includes(search) ||
-      c.email.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = filterStatus === 'All' || c.status === filterStatus;
-    return matchSearch && matchStatus;
-  });
-
-  const totalAdvanceCollected = customers.reduce((acc, c) => acc + c.advancePaid, 0);
-  const totalRemainingAdvance = customers.reduce((acc, c) => acc + c.advanceBalance, 0);
-  const totalBookedCases = customers.reduce((acc, c) => acc + c.bookedCases, 0);
-  const totalDispatchedCases = customers.reduce((acc, c) => acc + c.dispatchedCases, 0);
-  const totalRemainingCases = customers.reduce((acc, c) => acc + c.remainingCases, 0);
-
-  const currentCustomerTxList = selectedCustomer ? transactions[selectedCustomer.id] || [] : [];
+      c.id.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
-    <div>
-      {/* ── Stats Row tailored for Crackers Advance & Cases ── */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-xl p-5 border border-gray-200 hover:shadow-md transition-shadow">
-          <p className="text-[10px] font-semibold text-gray-400 tracking-widest uppercase mb-2">Total Advance Collected</p>
-          <p className="text-2xl font-bold text-gray-900 leading-tight">₹{totalAdvanceCollected.toLocaleString('en-IN')}</p>
-          <p className="text-xs text-green-600 mt-1 font-medium">₹{totalRemainingAdvance.toLocaleString('en-IN')} advance balance remaining</p>
+    <div className="space-y-6">
+      {/* ── Page Title & Action Controls Header ── */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Customers</h1>
+          <p className="text-sm text-slate-500 mt-1">
+            Customer directory with live Debit (Purchases), Credit (Paid/Advance), and Balance
+          </p>
         </div>
 
-        <div className="bg-white rounded-xl p-5 border border-gray-200 hover:shadow-md transition-shadow">
-          <p className="text-[10px] font-semibold text-gray-400 tracking-widest uppercase mb-2">Total Cases Booked</p>
-          <p className="text-2xl font-bold text-blue-600 leading-tight">{totalBookedCases} Cases</p>
-          <p className="text-xs text-gray-400 mt-1">Across all registered customers</p>
-        </div>
+        <div className="flex items-center gap-3">
+          {/* Search Box */}
+          <div className="relative">
+            <Search
+              size={16}
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+            />
+            <input
+              type="text"
+              placeholder="Search customers..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-64 pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all shadow-xs"
+            />
+          </div>
 
-        <div className="bg-white rounded-xl p-5 border border-gray-200 hover:shadow-md transition-shadow">
-          <p className="text-[10px] font-semibold text-gray-400 tracking-widest uppercase mb-2">Cases Dispatched</p>
-          <p className="text-2xl font-bold text-emerald-600 leading-tight">{totalDispatchedCases} Cases</p>
-          <p className="text-xs text-emerald-600 mt-1 font-medium">Successfully delivered</p>
-        </div>
+          {/* Print List Button */}
+          <button
+            onClick={handlePrintList}
+            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 font-semibold rounded-xl text-sm hover:bg-slate-50 active:scale-[0.98] transition-all shadow-xs cursor-pointer"
+          >
+            <Printer size={16} className="text-slate-500" />
+            Print List ({filteredCustomers.length})
+          </button>
 
-        <div className="bg-white rounded-xl p-5 border border-gray-200 hover:shadow-md transition-shadow">
-          <p className="text-[10px] font-semibold text-gray-400 tracking-widest uppercase mb-2">Cases Pending Dispatch</p>
-          <p className="text-2xl font-bold text-amber-500 leading-tight">{totalRemainingCases} Cases</p>
-          <p className="text-xs text-amber-600 mt-1 font-medium">To be delivered</p>
+          {/* Add New Customer Button */}
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-sm active:scale-[0.98] transition-all shadow-sm shadow-blue-500/20 cursor-pointer"
+          >
+            <Plus size={16} />
+            Add New Customer
+          </button>
         </div>
       </div>
 
-      {/* ── Table & Controls ── */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5">
-        <div className="flex items-center justify-between mb-5">
-          <div>
-            <h3 className="font-semibold text-gray-900 text-[15px]">Customers & Case Advance Ledger</h3>
-            <p className="text-xs text-gray-400">Click any customer row to view dispatch entries & remaining balance details</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search customer or phone..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-56 pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-              />
-            </div>
-            <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-lg px-1 py-1">
-              {['All', 'Active', 'Completed'].map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setFilterStatus(s)}
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                    filterStatus === s ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-                  }`}
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={() => setIsAddModalOpen(true)}
-              className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 active:scale-[0.98] transition-all shadow-sm shadow-blue-200 cursor-pointer"
-            >
-              <Plus size={15} />
-              Add Customer & Advance
-            </button>
-          </div>
-        </div>
-
-        {/* ── Customers Table ── */}
+      {/* ── Customers Directory Table Card ── */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-gray-100 bg-gray-50/50">
-                <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider py-3.5 px-4">#</th>
-                <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider py-3.5 px-4">Customer Name</th>
-                <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider py-3.5 px-4">Advance Paid</th>
-                <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider py-3.5 px-4">Remaining Advance</th>
-                <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider py-3.5 px-4">Booked Cases</th>
-                <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider py-3.5 px-4">Dispatched / Remaining</th>
-                <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider py-3.5 px-4">Status</th>
-                <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider py-3.5 px-4">Actions</th>
+              <tr className="border-b border-slate-100 bg-slate-50/70">
+                <th className="py-4 px-6 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  ID
+                </th>
+                <th className="py-4 px-6 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  CUSTOMER NAME
+                </th>
+                <th className="py-4 px-6 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  ADDRESS & CONTACT
+                </th>
+                <th className="py-4 px-6 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  DEBIT (DR)
+                </th>
+                <th className="py-4 px-6 text-[11px] font-bold text-emerald-600 uppercase tracking-wider">
+                  CREDIT (CR)
+                </th>
+                <th className="py-4 px-6 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  NET BALANCE
+                </th>
+                <th className="py-4 px-6 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  ACTIONS
+                </th>
               </tr>
             </thead>
-            <tbody>
-              {filtered.map((c, idx) => {
-                const casePercent = Math.round((c.dispatchedCases / (c.bookedCases || 1)) * 100);
+            <tbody className="divide-y divide-slate-100 text-sm">
+              {filteredCustomers.map((cust) => {
+                const netBalance = cust.debit - cust.credit;
+                const isDue = netBalance > 0;
+                const isAdvance = netBalance < 0;
+
                 return (
                   <tr
-                    key={c.id}
-                    onClick={() => setSelectedCustomer(c)}
-                    className="border-b border-gray-50 hover:bg-blue-50/40 transition-colors cursor-pointer group"
+                    key={cust.id}
+                    className="hover:bg-slate-50/60 transition-colors cursor-pointer group"
+                    onClick={() => openLedgerModal(cust)}
                   >
-                    <td className="py-4 px-4 text-sm text-gray-400">{idx + 1}</td>
-                    <td className="py-4 px-4">
+                    {/* ID */}
+                    <td className="py-4 px-6 font-mono text-slate-400 text-xs font-medium">
+                      {cust.id}
+                    </td>
+
+                    {/* Customer Name */}
+                    <td className="py-4 px-6">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center text-xs font-bold group-hover:scale-105 transition-transform">
-                          {c.name.charAt(0)}
+                        <div className="w-9 h-9 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-xs shrink-0">
+                          {cust.name.charAt(0)}
                         </div>
                         <div>
-                          <p className="text-sm font-semibold text-gray-900 group-hover:text-blue-600 group-hover:underline transition-colors">
-                            {c.name}
+                          <p className="font-bold text-slate-900 text-sm tracking-wide uppercase group-hover:text-blue-600 transition-colors">
+                            {cust.name}
                           </p>
-                          <p className="text-[11px] text-gray-400">{c.phone} • {c.email}</p>
+                          <p className="text-xs text-slate-400 font-medium mt-0.5">
+                            GST: {cust.gst}
+                          </p>
                         </div>
                       </div>
                     </td>
-                    <td className="py-4 px-4 text-sm font-semibold text-gray-900">
-                      ₹{c.advancePaid.toLocaleString('en-IN')}
-                    </td>
-                    <td className="py-4 px-4">
-                      <span className={`text-sm font-bold ${c.advanceBalance > 0 ? 'text-green-600' : 'text-gray-400'}`}>
-                        ₹{c.advanceBalance.toLocaleString('en-IN')}
-                      </span>
-                    </td>
-                    <td className="py-4 px-4 text-sm font-semibold text-blue-600">
-                      {c.bookedCases} Cases
-                    </td>
-                    <td className="py-4 px-4">
-                      <div className="w-36">
-                        <div className="flex items-center justify-between text-xs mb-1">
-                          <span className="font-semibold text-gray-800">{c.dispatchedCases} Sent</span>
-                          <span className="text-amber-600 font-medium">{c.remainingCases} Left</span>
-                        </div>
-                        <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-blue-500 rounded-full transition-all"
-                            style={{ width: `${Math.min(casePercent, 100)}%` }}
-                          />
-                        </div>
+
+                    {/* Address & Contact */}
+                    <td className="py-4 px-6">
+                      <div>
+                        <p className="font-semibold text-slate-700 text-xs tracking-wide uppercase">
+                          {cust.address}
+                        </p>
+                        <p className="text-xs text-slate-500 font-medium flex items-center gap-1 mt-0.5">
+                          <Phone size={12} className="text-pink-500 shrink-0" />
+                          {cust.phone}
+                        </p>
                       </div>
                     </td>
-                    <td className="py-4 px-4">
-                      <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-md ${
-                        c.status === 'Active' ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-gray-100 text-gray-600'
-                      }`}>
-                        {c.status}
-                      </span>
+
+                    {/* Debit (DR) */}
+                    <td className="py-4 px-6 font-bold text-slate-900 text-sm">
+                      {formatCurrency(cust.debit)}
                     </td>
-                    <td className="py-4 px-4" onClick={(e) => e.stopPropagation()}>
+
+                    {/* Credit (CR) */}
+                    <td className="py-4 px-6 font-bold text-emerald-600 text-sm">
+                      {formatCurrency(cust.credit)}
+                    </td>
+
+                    {/* Net Balance */}
+                    <td className="py-4 px-6">
+                      <div>
+                        <p
+                          className={`font-bold text-sm ${
+                            isDue
+                              ? 'text-rose-600'
+                              : isAdvance
+                              ? 'text-emerald-600'
+                              : 'text-slate-600'
+                          }`}
+                        >
+                          {formatCurrency(Math.abs(netBalance))}
+                        </p>
+                        <span
+                          className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-md mt-0.5 ${
+                            isDue
+                              ? 'bg-rose-50 text-rose-600 border border-rose-100'
+                              : isAdvance
+                              ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
+                              : 'bg-slate-100 text-slate-500'
+                          }`}
+                        >
+                          {isDue ? 'Due' : isAdvance ? 'Advance Credit' : 'Paid Clean'}
+                        </span>
+                      </div>
+                    </td>
+
+                    {/* Actions */}
+                    <td className="py-4 px-6" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-1.5">
+                        {/* Action 1: Ledger / History */}
                         <button
-                          onClick={(e) => openDispatchModal(c, e)}
-                          title="Dispatch Cases to Customer"
-                          className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-all cursor-pointer"
-                        >
-                          <Send size={13} />
-                          Dispatch
-                        </button>
-                        <button
-                          onClick={() => setSelectedCustomer(c)}
+                          onClick={(e) => openLedgerModal(cust, e)}
                           title="View Ledger & History"
-                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors cursor-pointer"
+                          className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 flex items-center justify-center transition-colors cursor-pointer"
                         >
-                          <Eye size={15} />
+                          <CreditCard size={15} />
                         </button>
+
+                        {/* Action 2: Add Credit / Payment */}
                         <button
-                          onClick={(e) => handleDelete(c.id, e)}
-                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors cursor-pointer"
+                          onClick={(e) => openPaymentModal(cust, e)}
+                          title="Record Payment (Credit)"
+                          className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 flex items-center justify-center transition-colors cursor-pointer"
+                        >
+                          <Wallet size={15} />
+                        </button>
+
+                        {/* Action 3: Edit */}
+                        <button
+                          onClick={(e) => openEditModal(cust, e)}
+                          title="Edit Customer"
+                          className="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center justify-center transition-colors cursor-pointer"
+                        >
+                          <Edit3 size={15} />
+                        </button>
+
+                        {/* Action 4: Delete */}
+                        <button
+                          onClick={(e) => handleDelete(cust.id, e)}
+                          title="Delete Customer"
+                          className="w-8 h-8 rounded-lg bg-slate-100 text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center transition-colors cursor-pointer"
                         >
                           <Trash2 size={15} />
                         </button>
@@ -455,10 +521,11 @@ const Customers = () => {
                   </tr>
                 );
               })}
-              {filtered.length === 0 && (
+
+              {filteredCustomers.length === 0 && (
                 <tr>
-                  <td colSpan="8" className="text-center py-8 text-gray-400 text-sm">
-                    No customers found matching your search.
+                  <td colSpan="7" className="text-center py-12 text-slate-400 text-sm">
+                    No customers found matching search criteria.
                   </td>
                 </tr>
               )}
@@ -467,302 +534,481 @@ const Customers = () => {
         </div>
       </div>
 
-      {/* ── Customer Profile & Transaction Ledger Modal ── */}
-      {selectedCustomer && (
+      {/* ── Modal 1: Add New Customer ── */}
+      {isAddModalOpen && (
         <Modal
-          isOpen={!!selectedCustomer}
-          onClose={() => setSelectedCustomer(null)}
-          title={`Crackers Dispatch & Advance Ledger - ${selectedCustomer.name}`}
+          isOpen={isAddModalOpen}
+          onClose={() => setIsAddModalOpen(false)}
+          title="Add New Customer"
+        >
+          <form onSubmit={handleAddCustomer} className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                Customer Name / Firm Name <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. SAI MOHAN MARKETING"
+                value={formData.name}
+                onChange={handleInputChange}
+                name="name"
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm uppercase focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  GSTIN Number
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. 22ADWPN7742F1Z7"
+                  value={formData.gst}
+                  onChange={handleInputChange}
+                  name="gst"
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm uppercase font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  State / Location <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. CHHATTISGARH"
+                  value={formData.address}
+                  onChange={handleInputChange}
+                  name="address"
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm uppercase focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Phone Number <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="tel"
+                  required
+                  placeholder="e.g. 86020 05900"
+                  value={formData.phone}
+                  onChange={handleInputChange}
+                  name="phone"
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  placeholder="e.g. customer@shop.com"
+                  value={formData.email}
+                  onChange={handleInputChange}
+                  name="email"
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Opening Debit / Purchases (₹)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="e.g. 307506.00"
+                  value={formData.debit}
+                  onChange={handleInputChange}
+                  name="debit"
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-emerald-700 uppercase tracking-wider mb-1.5">
+                  Opening Credit / Payment (₹)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="e.g. 307500.00"
+                  value={formData.credit}
+                  onChange={handleInputChange}
+                  name="credit"
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-emerald-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsAddModalOpen(false)}
+                className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-5 py-2.5 bg-blue-600 text-white font-semibold text-sm rounded-xl hover:bg-blue-700 transition-all shadow-sm cursor-pointer"
+              >
+                Save Customer
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* ── Modal 2: Edit Customer ── */}
+      {isEditModalOpen && editCustomer && (
+        <Modal
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          title={`Edit Customer - ${editCustomer.name}`}
+        >
+          <form onSubmit={handleUpdateCustomer} className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                Customer Name / Firm Name
+              </label>
+              <input
+                type="text"
+                required
+                value={formData.name}
+                onChange={handleInputChange}
+                name="name"
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm uppercase focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  GSTIN Number
+                </label>
+                <input
+                  type="text"
+                  value={formData.gst}
+                  onChange={handleInputChange}
+                  name="gst"
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm uppercase font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  State / Location
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formData.address}
+                  onChange={handleInputChange}
+                  name="address"
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm uppercase focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Phone Number
+                </label>
+                <input
+                  type="tel"
+                  required
+                  value={formData.phone}
+                  onChange={handleInputChange}
+                  name="phone"
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={handleInputChange}
+                  name="email"
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsEditModalOpen(false)}
+                className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-5 py-2.5 bg-blue-600 text-white font-semibold text-sm rounded-xl hover:bg-blue-700 transition-all shadow-sm cursor-pointer"
+              >
+                Update Customer
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* ── Modal 3: Record Payment / Credit or Debit ── */}
+      {isPaymentModalOpen && selectedCustomer && (
+        <Modal
+          isOpen={isPaymentModalOpen}
+          onClose={() => setIsPaymentModalOpen(false)}
+          title={`Record Payment / Transaction - ${selectedCustomer.name}`}
+        >
+          <form onSubmit={handlePaymentSubmit} className="space-y-4">
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between text-xs">
+              <div>
+                <p className="font-bold text-slate-900">{selectedCustomer.name}</p>
+                <p className="text-slate-500">GST: {selectedCustomer.gst}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-slate-500">Net Due Balance:</p>
+                <p className="font-bold text-rose-600">
+                  {formatCurrency(selectedCustomer.debit - selectedCustomer.credit)}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer">
+                <input
+                  type="radio"
+                  name="type"
+                  value="credit"
+                  checked={paymentForm.type === 'credit'}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, type: e.target.value })}
+                  className="text-emerald-600 focus:ring-emerald-500"
+                />
+                Credit (Payment Received)
+              </label>
+
+              <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer">
+                <input
+                  type="radio"
+                  name="type"
+                  value="debit"
+                  checked={paymentForm.type === 'debit'}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, type: e.target.value })}
+                  className="text-blue-600 focus:ring-blue-500"
+                />
+                Debit (New Purchase / Bill)
+              </label>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                Amount (₹) <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                required
+                placeholder="e.g. 50000.00"
+                value={paymentForm.amount}
+                onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-base font-bold text-emerald-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+              />
+            </div>
+
+            {paymentForm.type === 'credit' && (
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Payment Method
+                </label>
+                <select
+                  value={paymentForm.paymentMethod}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, paymentMethod: e.target.value })}
+                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 cursor-pointer"
+                >
+                  <option value="UPI">UPI</option>
+                  <option value="Cash">Cash</option>
+                  <option value="Bank Transfer">Bank Transfer</option>
+                  <option value="NEFT">NEFT / RTGS</option>
+                  <option value="Cheque">Cheque</option>
+                </select>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                Reference / Inv No.
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. PAY-2024-001 or INV-8891"
+                value={paymentForm.ref}
+                onChange={(e) => setPaymentForm({ ...paymentForm, ref: e.target.value })}
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                Description / Notes
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Advance payment received via UPI"
+                value={paymentForm.desc}
+                onChange={(e) => setPaymentForm({ ...paymentForm, desc: e.target.value })}
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsPaymentModalOpen(false)}
+                className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-5 py-2.5 bg-emerald-600 text-white font-semibold text-sm rounded-xl hover:bg-emerald-700 transition-all shadow-sm cursor-pointer"
+              >
+                Save Transaction
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* ── Modal 4: Customer Ledger & History ── */}
+      {isLedgerModalOpen && selectedCustomer && (
+        <Modal
+          isOpen={isLedgerModalOpen}
+          onClose={() => setIsLedgerModalOpen(false)}
+          title={`Customer Ledger - ${selectedCustomer.name}`}
           width="max-w-3xl"
         >
           <div className="space-y-6">
-            {/* Header info banner */}
-            <div className="bg-gradient-to-br from-slate-900 to-blue-950 text-white rounded-2xl p-6 shadow-xl relative overflow-hidden">
+            {/* Header info */}
+            <div className="bg-slate-900 text-white rounded-2xl p-6 shadow-md relative overflow-hidden">
               <div className="flex items-start justify-between relative z-10">
                 <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center text-2xl font-bold text-amber-300 border border-white/10">
+                  <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center font-bold text-xl text-white">
                     {selectedCustomer.name.charAt(0)}
                   </div>
                   <div>
-                    <h4 className="text-xl font-bold">{selectedCustomer.name}</h4>
-                    <div className="flex items-center gap-4 mt-1.5 text-xs text-gray-300">
-                      <span><Phone size={13} className="inline text-blue-400 mr-1" /> {selectedCustomer.phone}</span>
-                      <span><Calendar size={13} className="inline text-blue-400 mr-1" /> Booking Date: {selectedCustomer.joined}</span>
-                    </div>
+                    <h3 className="text-xl font-bold">{selectedCustomer.name}</h3>
+                    <p className="text-xs text-slate-400 mt-1">
+                      GST: {selectedCustomer.gst} • Location: {selectedCustomer.address}
+                    </p>
                   </div>
                 </div>
+
                 <button
-                  onClick={() => openDispatchModal(selectedCustomer)}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer"
+                  onClick={(e) => {
+                    setIsLedgerModalOpen(false);
+                    openPaymentModal(selectedCustomer, e);
+                  }}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
                 >
-                  <Send size={14} /> Dispatch Products
+                  <Wallet size={14} /> Record Payment
                 </button>
               </div>
 
-              {/* Advance & Cases Deduction Summary Grid */}
-              <div className="grid grid-cols-4 gap-3 mt-6 pt-5 border-t border-white/10 relative z-10">
-                <div className="bg-white/5 rounded-xl p-3 backdrop-blur-sm border border-white/5">
-                  <p className="text-[10px] uppercase tracking-wider text-gray-400 font-medium">Advance Paid</p>
-                  <p className="text-base font-bold text-white mt-0.5">₹{selectedCustomer.advancePaid.toLocaleString('en-IN')}</p>
+              {/* Balances Grid */}
+              <div className="grid grid-cols-3 gap-4 mt-6 pt-5 border-t border-slate-800">
+                <div className="bg-slate-800/60 rounded-xl p-3 border border-slate-700/50">
+                  <p className="text-[10px] uppercase font-bold text-slate-400">Total Debit (Purchases)</p>
+                  <p className="text-lg font-bold text-white mt-0.5">
+                    {formatCurrency(selectedCustomer.debit)}
+                  </p>
                 </div>
 
-                <div className="bg-white/5 rounded-xl p-3 backdrop-blur-sm border border-white/5">
-                  <p className="text-[10px] uppercase tracking-wider text-gray-400 font-medium">Remaining Advance</p>
-                  <p className="text-base font-bold text-emerald-400 mt-0.5">₹{selectedCustomer.advanceBalance.toLocaleString('en-IN')}</p>
+                <div className="bg-slate-800/60 rounded-xl p-3 border border-slate-700/50">
+                  <p className="text-[10px] uppercase font-bold text-slate-400">Total Credit (Paid)</p>
+                  <p className="text-lg font-bold text-emerald-400 mt-0.5">
+                    {formatCurrency(selectedCustomer.credit)}
+                  </p>
                 </div>
 
-                <div className="bg-white/5 rounded-xl p-3 backdrop-blur-sm border border-white/5">
-                  <p className="text-[10px] uppercase tracking-wider text-gray-400 font-medium">Booked Cases</p>
-                  <p className="text-base font-bold text-blue-300 mt-0.5">{selectedCustomer.bookedCases} Cases</p>
-                </div>
-
-                <div className="bg-white/5 rounded-xl p-3 backdrop-blur-sm border border-white/5">
-                  <p className="text-[10px] uppercase tracking-wider text-gray-400 font-medium">Cases Pending</p>
-                  <p className="text-base font-bold text-amber-400 mt-0.5">{selectedCustomer.remainingCases} Cases Left</p>
+                <div className="bg-slate-800/60 rounded-xl p-3 border border-slate-700/50">
+                  <p className="text-[10px] uppercase font-bold text-slate-400">Net Balance Due</p>
+                  <p className="text-lg font-bold text-rose-400 mt-0.5">
+                    {formatCurrency(selectedCustomer.debit - selectedCustomer.credit)}
+                  </p>
                 </div>
               </div>
             </div>
 
-            {/* Ledger Table */}
+            {/* Transactions History Table */}
             <div>
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="font-bold text-gray-900 text-base flex items-center gap-2">
-                  <Boxes size={18} className="text-blue-600" />
-                  Dispatch & Advance History
-                </h4>
-              </div>
-
-              <div className="border border-gray-200 rounded-xl overflow-hidden">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-gray-50 border-b border-gray-200">
+              <h4 className="font-bold text-slate-900 text-sm mb-3">Transaction History</h4>
+              <div className="border border-slate-200 rounded-xl overflow-hidden text-xs">
+                <table className="w-full text-left">
+                  <thead className="bg-slate-50 border-b border-slate-200">
                     <tr>
-                      <th className="py-3 px-3 font-semibold text-gray-500 uppercase">Date</th>
-                      <th className="py-3 px-3 font-semibold text-gray-500 uppercase">Ref No.</th>
-                      <th className="py-3 px-3 font-semibold text-gray-500 uppercase">Details</th>
-                      <th className="py-3 px-3 font-semibold text-gray-500 uppercase">Cases Sent</th>
-                      <th className="py-3 px-3 font-semibold text-gray-500 uppercase">Bill Amount</th>
-                      <th className="py-3 px-3 font-semibold text-gray-500 uppercase">Remaining Advance</th>
-                      <th className="py-3 px-3 font-semibold text-gray-500 uppercase">Remaining Cases</th>
+                      <th className="py-3 px-4 font-bold text-slate-600">Date</th>
+                      <th className="py-3 px-4 font-bold text-slate-600">Ref No.</th>
+                      <th className="py-3 px-4 font-bold text-slate-600">Details</th>
+                      <th className="py-3 px-4 font-bold text-slate-600">Type</th>
+                      <th className="py-3 px-4 font-bold text-slate-600">Amount</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {currentCustomerTxList.map((tx, idx) => (
-                      <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                        <td className="py-3 px-3 font-medium text-gray-600">{tx.date}</td>
-                        <td className="py-3 px-3 font-mono font-semibold text-gray-900">{tx.ref}</td>
-                        <td className="py-3 px-3 font-medium text-gray-800">{tx.desc}</td>
-                        <td className="py-3 px-3">
-                          {tx.type === 'dispatch' ? (
-                            <span className="font-bold text-blue-600">−{tx.casesSent} Cases</span>
-                          ) : (
-                            <span className="text-gray-400">—</span>
-                          )}
-                        </td>
-                        <td className="py-3 px-3">
-                          <span className={`font-bold ${tx.type === 'dispatch' ? 'text-red-500' : 'text-green-600'}`}>
-                            {tx.type === 'dispatch' ? '−' : '+' }₹{tx.amount.toLocaleString('en-IN')}
+                  <tbody className="divide-y divide-slate-100">
+                    {(transactions[selectedCustomer.id] || []).map((tx, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50">
+                        <td className="py-3 px-4 font-medium text-slate-600">{tx.date}</td>
+                        <td className="py-3 px-4 font-mono font-semibold text-slate-900">{tx.ref}</td>
+                        <td className="py-3 px-4 font-medium text-slate-800">{tx.desc}</td>
+                        <td className="py-3 px-4">
+                          <span
+                            className={`font-bold px-2 py-0.5 rounded ${
+                              tx.type === 'credit'
+                                ? 'bg-emerald-50 text-emerald-700'
+                                : 'bg-rose-50 text-rose-700'
+                            }`}
+                          >
+                            {tx.type === 'credit' ? 'CREDIT' : 'DEBIT'}
                           </span>
                         </td>
-                        <td className="py-3 px-3 font-semibold text-emerald-600">₹{tx.remainingAdvance.toLocaleString('en-IN')}</td>
-                        <td className="py-3 px-3 font-semibold text-amber-600">{tx.remainingCases} Cases</td>
+                        <td
+                          className={`py-3 px-4 font-bold ${
+                            tx.type === 'credit' ? 'text-emerald-600' : 'text-slate-900'
+                          }`}
+                        >
+                          {tx.type === 'credit' ? '+' : '-'}{formatCurrency(tx.amount)}
+                        </td>
                       </tr>
                     ))}
+
+                    {(!transactions[selectedCustomer.id] ||
+                      transactions[selectedCustomer.id].length === 0) && (
+                      <tr>
+                        <td colSpan="5" className="text-center py-6 text-slate-400">
+                          No transactions logged yet.
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
             </div>
           </div>
-        </Modal>
-      )}
-
-      {/* ── Dispatch Products Modal ── */}
-      {isDispatchModalOpen && dispatchCustomer && (
-        <Modal
-          isOpen={isDispatchModalOpen}
-          onClose={() => setIsDispatchModalOpen(false)}
-          title={`Dispatch Crackers to ${dispatchCustomer.name}`}
-        >
-          <form onSubmit={handleProcessDispatch} className="space-y-4">
-            {/* Customer Summary Bar */}
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 flex items-center justify-between text-xs">
-              <div>
-                <p className="font-semibold text-blue-900">{dispatchCustomer.name}</p>
-                <p className="text-blue-700">Remaining Cases: <strong>{dispatchCustomer.remainingCases} Cases</strong></p>
-              </div>
-              <div className="text-right">
-                <p className="text-blue-700">Advance Balance: <strong>₹{dispatchCustomer.advanceBalance.toLocaleString('en-IN')}</strong></p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
-                  Cases to Dispatch <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  name="casesSent"
-                  required
-                  min="1"
-                  max={dispatchCustomer.remainingCases || 9999}
-                  placeholder="e.g. 10"
-                  value={dispatchData.casesSent}
-                  onChange={handleDispatchInputChange}
-                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
-                  Calculated Bill Amount (₹) <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  name="billAmount"
-                  required
-                  placeholder="e.g. 12000"
-                  value={dispatchData.billAmount}
-                  onChange={handleDispatchInputChange}
-                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
-                Dispatch Description / Products Sent
-              </label>
-              <input
-                type="text"
-                name="desc"
-                placeholder="e.g. 10 Cases of Sparklers & Ground Chakkars"
-                value={dispatchData.desc}
-                onChange={handleDispatchInputChange}
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
-              <button
-                type="button"
-                onClick={() => setIsDispatchModalOpen(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-xl"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-5 py-2 bg-emerald-600 text-white font-semibold text-sm rounded-xl hover:bg-emerald-700 active:scale-[0.98] transition-all cursor-pointer"
-              >
-                Confirm Dispatch & Deduct
-              </button>
-            </div>
-          </form>
-        </Modal>
-      )}
-
-      {/* ── Add Customer & Advance Modal ── */}
-      {isAddModalOpen && (
-        <Modal
-          isOpen={isAddModalOpen}
-          onClose={() => setIsAddModalOpen(false)}
-          title="New Crackers Customer & Advance Order"
-        >
-          <form onSubmit={handleAddCustomer} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
-                Customer Name / Shop Name <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                name="name"
-                required
-                placeholder="e.g. Sri Sai Crackers Store"
-                value={formData.name}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
-                  Phone Number <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="tel"
-                  name="phone"
-                  required
-                  placeholder="e.g. 9876543210"
-                  value={formData.phone}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
-                  Email Address
-                </label>
-                <input
-                  type="email"
-                  name="email"
-                  placeholder="e.g. info@shop.com"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
-                  Advance Amount Paid (₹) <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  name="advancePaid"
-                  required
-                  placeholder="e.g. 50000"
-                  value={formData.advancePaid}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
-                  Total Cases Booked <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  name="bookedCases"
-                  required
-                  placeholder="e.g. 50"
-                  value={formData.bookedCases}
-                  onChange={handleInputChange}
-                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
-              <button
-                type="button"
-                onClick={() => setIsAddModalOpen(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-xl"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-5 py-2 bg-blue-600 text-white font-semibold text-sm rounded-xl hover:bg-blue-700 active:scale-[0.98] transition-all cursor-pointer"
-              >
-                Save & Book Order
-              </button>
-            </div>
-          </form>
         </Modal>
       )}
     </div>
