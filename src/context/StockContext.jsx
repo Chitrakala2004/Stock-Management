@@ -44,7 +44,15 @@ export const StockProvider = ({ children }) => {
         })));
       }
       if (brandRes.data && brandRes.data.length > 0) {
-        setBrands(brandRes.data.map(b => typeof b === 'string' ? b : b.name));
+        setBrands(
+          brandRes.data.map((b, idx) => ({
+            id: b._id || b.id || idx + 1,
+            _id: b._id || b.id,
+            name: typeof b === 'string' ? b : b.name,
+            address: b.address || 'Sivakasi, Tamil Nadu',
+            gst: b.gst || 'N/A',
+          }))
+        );
       } else {
         setBrands([]);
       }
@@ -75,55 +83,152 @@ export const StockProvider = ({ children }) => {
     fetchAllFromBackend();
   }, []);
 
-  // Brand Management
-  const addBrand = (brandName) => {
-    if (!brandName || brands.includes(brandName.trim())) return false;
-    setBrands((prev) => [...prev, brandName.trim()]);
-    return true;
+  // Brand / Company Management (MongoDB Atlas)
+  const addBrand = async (brandData) => {
+    const brandName = typeof brandData === 'string' ? brandData.trim() : brandData?.name?.trim();
+    if (!brandName) return false;
+
+    const payload = typeof brandData === 'string'
+      ? { name: brandName, address: 'Sivakasi, Tamil Nadu', gst: 'N/A' }
+      : {
+          name: brandName,
+          address: brandData.address || 'Sivakasi, Tamil Nadu',
+          gst: brandData.gst || 'N/A',
+        };
+
+    try {
+      const res = await brandService.create(payload);
+      const saved = res.data;
+      const formatted = {
+        id: saved._id || saved.id || `BRD-${Date.now()}`,
+        _id: saved._id || saved.id,
+        name: saved.name,
+        address: saved.address || payload.address,
+        gst: saved.gst || payload.gst,
+      };
+      setBrands((prev) => [formatted, ...prev.filter(b => (typeof b === 'string' ? b : b.name) !== brandName)]);
+      return formatted;
+    } catch (err) {
+      console.error('Error creating brand in backend:', err);
+      const fallback = {
+        id: `BRD-${Date.now()}`,
+        name: brandName,
+        address: payload.address,
+        gst: payload.gst,
+      };
+      setBrands((prev) => [fallback, ...prev]);
+      return fallback;
+    }
   };
 
-  // Product / Stock Management
-  const addProduct = (newProduct) => {
-    const id = `PROD-${Date.now()}`;
-    const p = {
-      id,
-      brand: newProduct.brand,
-      name: newProduct.name,
+  const updateBrand = async (id, updatedData) => {
+    try {
+      const res = await brandService.update(id, updatedData);
+      const updated = res.data;
+      setBrands((prev) =>
+        prev.map((b) =>
+          b.id === id || b._id === id || b.name === id
+            ? { ...b, ...updated, id: updated._id || updated.id || b.id }
+            : b
+        )
+      );
+      return updated;
+    } catch (err) {
+      console.error('Error updating brand in backend:', err);
+      setBrands((prev) =>
+        prev.map((b) => (b.id === id || b.name === id ? { ...b, ...updatedData } : b))
+      );
+    }
+  };
+
+  const deleteBrand = async (id) => {
+    try {
+      await brandService.delete(id);
+      setBrands((prev) => prev.filter((b) => b.id !== id && b._id !== id && b.name !== id));
+    } catch (err) {
+      console.error('Error deleting brand from backend:', err);
+      setBrands((prev) => prev.filter((b) => b.id !== id && b.name !== id));
+    }
+  };
+
+  // Product / Stock Management (MongoDB Atlas)
+  const addProduct = async (newProduct) => {
+    const defaultBrand = brands[0] ? (typeof brands[0] === 'string' ? brands[0] : brands[0].name) : 'Standard Crackers';
+    const payload = {
+      brand: newProduct.brand || defaultBrand,
+      name: newProduct.name ? newProduct.name.trim() : 'Unnamed Product',
       category: newProduct.category || 'General Crackers',
       image: newProduct.image || '',
-      pricePerPiece: parseFloat(newProduct.pricePerPiece) || 0,
-      piecesPerCase: parseInt(newProduct.piecesPerCase, 10) || 1,
-      availableCases: parseInt(newProduct.availableCases, 10) || 0,
+      pricePerPiece: parseFloat(newProduct.pricePerPiece) || 10,
+      piecesPerCase: parseInt(newProduct.piecesPerCase, 10) || 10,
+      availableCases: parseInt(newProduct.availableCases, 10) || 50,
       minStockCases: parseInt(newProduct.minStockCases, 10) || 10,
     };
 
-    setProducts((prev) => [p, ...prev]);
+    try {
+      const res = await productService.create(payload);
+      const saved = res.data;
+      const formatted = {
+        ...saved,
+        id: saved.id || saved._id,
+      };
+      setProducts((prev) => [formatted, ...prev]);
 
-    // Log stock transaction
-    const log = {
-      id: `STX-${Date.now()}`,
-      date: new Date().toISOString().split('T')[0],
-      productId: p.id,
-      productName: p.name,
-      brand: p.brand,
-      transactionType: 'Initial Stock Addition',
-      casesChanged: p.availableCases,
-      piecesChanged: p.availableCases * p.piecesPerCase,
-      reason: 'New Product Added by Admin',
-    };
-    setStockTransactions((prev) => [log, ...prev]);
+      // Log stock transaction
+      const logPayload = {
+        date: new Date().toISOString().split('T')[0],
+        productId: formatted.id,
+        productName: formatted.name,
+        brand: formatted.brand,
+        transactionType: 'Initial Stock Addition',
+        casesChanged: formatted.availableCases,
+        piecesChanged: formatted.availableCases * formatted.piecesPerCase,
+        reason: 'New Product Added by Admin',
+      };
+      try {
+        await transactionService.create(logPayload);
+      } catch (e) {}
+      setStockTransactions((prev) => [{ id: `STX-${Date.now()}`, ...logPayload }, ...prev]);
+      return formatted;
+    } catch (err) {
+      console.error('Error adding product in backend:', err);
+      const fallback = {
+        id: `PROD-${Date.now()}`,
+        ...payload,
+      };
+      setProducts((prev) => [fallback, ...prev]);
+      return fallback;
+    }
   };
 
-  const updateProduct = (updatedProduct) => {
-    setProducts((prev) =>
-      prev.map((p) => (p.id === updatedProduct.id ? { ...p, ...updatedProduct } : p))
-    );
+  const updateProduct = async (updatedProduct) => {
+    const id = updatedProduct.id || updatedProduct._id;
+    try {
+      const res = await productService.update(id, updatedProduct);
+      const updated = res.data;
+      const formatted = { ...updated, id: updated.id || updated._id };
+      setProducts((prev) =>
+        prev.map((p) => (p.id === id || p._id === id ? formatted : p))
+      );
+      return formatted;
+    } catch (err) {
+      console.error('Error updating product in backend:', err);
+      setProducts((prev) =>
+        prev.map((p) => (p.id === id || p._id === id ? { ...p, ...updatedProduct } : p))
+      );
+    }
   };
 
-  const adjustProductStock = (productId, caseDelta, reason = 'Admin Manual Adjustment') => {
+  const adjustProductStock = async (productId, caseDelta, reason = 'Admin Manual Adjustment') => {
+    try {
+      await productService.adjustStock(productId, caseDelta);
+    } catch (err) {
+      console.error('Error adjusting stock in backend:', err);
+    }
+
     setProducts((prev) =>
       prev.map((p) => {
-        if (p.id === productId) {
+        if (p.id === productId || p._id === productId) {
           const newCases = Math.max(0, p.availableCases + caseDelta);
           return { ...p, availableCases: newCases };
         }
@@ -131,7 +236,7 @@ export const StockProvider = ({ children }) => {
       })
     );
 
-    const targetProd = products.find((p) => p.id === productId);
+    const targetProd = products.find((p) => p.id === productId || p._id === productId);
     if (targetProd) {
       const piecesDelta = caseDelta * targetProd.piecesPerCase;
       const log = {
@@ -145,49 +250,125 @@ export const StockProvider = ({ children }) => {
         piecesChanged: piecesDelta,
         reason,
       };
+      try {
+        await transactionService.create(log);
+      } catch (e) {}
       setStockTransactions((prev) => [log, ...prev]);
     }
   };
 
-  const deleteProduct = (id) => {
-    setProducts((prev) => prev.filter((p) => p.id !== id));
+  const deleteProduct = async (id) => {
+    try {
+      await productService.delete(id);
+      setProducts((prev) => prev.filter((p) => p.id !== id && p._id !== id));
+    } catch (err) {
+      console.error('Error deleting product from backend:', err);
+      setProducts((prev) => prev.filter((p) => p.id !== id && p._id !== id));
+    }
   };
 
   // Customer Management
-  const addCustomer = (customerData) => {
-    const newCust = {
-      id: `CUST-${Date.now()}`,
-      name: customerData.name,
-      phone: customerData.phone,
-      email: customerData.email || '',
-      status: 'Active',
-      createdAt: new Date().toISOString().split('T')[0],
-    };
-    setCustomers((prev) => [newCust, ...prev]);
-    return newCust;
+  const addCustomer = async (customerData) => {
+    try {
+      const payload = {
+        name: customerData.name,
+        phone: customerData.phone || '',
+        gst: customerData.gst || 'N/A',
+        address: customerData.address || '',
+        email: customerData.email || '',
+        debit: parseFloat(customerData.debit) || 0,
+        credit: parseFloat(customerData.credit) || 0,
+        status: customerData.status || 'Active',
+      };
+      const res = await customerService.create(payload);
+      const saved = res.data;
+      const formatted = {
+        ...saved,
+        id: saved.customId || saved.id || saved._id,
+      };
+      setCustomers((prev) => [formatted, ...prev]);
+      return formatted;
+    } catch (err) {
+      console.error('Error creating customer in backend:', err);
+      const fallbackCust = {
+        id: `CUST-${Date.now()}`,
+        ...customerData,
+        createdAt: new Date().toISOString().split('T')[0],
+      };
+      setCustomers((prev) => [fallbackCust, ...prev]);
+      return fallbackCust;
+    }
   };
 
-  const deleteCustomer = (id) => {
-    setCustomers((prev) => prev.filter((c) => c.id !== id));
+  const updateCustomer = async (id, updatedData) => {
+    try {
+      const res = await customerService.update(id, updatedData);
+      const updated = res.data;
+      const formatted = {
+        ...updated,
+        id: updated.customId || updated.id || updated._id,
+      };
+      setCustomers((prev) =>
+        prev.map((c) =>
+          c.id === id || c._id === id || c.customId === id ? formatted : c
+        )
+      );
+      return formatted;
+    } catch (err) {
+      console.error('Error updating customer:', err);
+      setCustomers((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, ...updatedData } : c))
+      );
+    }
+  };
+
+  const deleteCustomer = async (id) => {
+    try {
+      await customerService.delete(id);
+      setCustomers((prev) =>
+        prev.filter((c) => c.id !== id && c._id !== id && c.customId !== id)
+      );
+    } catch (err) {
+      console.error('Error deleting customer:', err);
+      setCustomers((prev) => prev.filter((c) => c.id !== id));
+    }
   };
 
   // Advance Payment Management
-  const addAdvancePayment = ({ customerId, amount, date, paymentReference, paymentMethod }) => {
-    const cust = customers.find((c) => c.id === customerId);
-    if (!cust || !amount) return false;
+  const addAdvancePayment = async ({ customerId, customerName, amount, date, paymentReference, paymentMethod }) => {
+    const cust = customers.find((c) => c.id === customerId || c._id === customerId || c.customId === customerId);
+    const resolvedName = customerName || cust?.name || 'Customer';
+    const parsedAmt = parseFloat(amount) || 0;
+    if (!parsedAmt) return false;
 
-    const newAdv = {
-      id: `ADV-${Date.now()}`,
-      customerId,
-      customerName: cust.name,
-      amount: parseFloat(amount) || 0,
+    const payload = {
+      customerId: cust?.customId || cust?.id || customerId,
+      customerName: resolvedName,
+      amount: parsedAmt,
+      creditAmt: parsedAmt,
       date: date || new Date().toISOString().split('T')[0],
       paymentReference: paymentReference || `REF-${Math.floor(1000 + Math.random() * 9000)}`,
       paymentMethod: paymentMethod || 'Cash',
     };
 
-    setAdvancePayments((prev) => [newAdv, ...prev]);
-    return true;
+    try {
+      const res = await advanceService.create(payload);
+      const saved = res.data;
+      const formatted = {
+        ...saved,
+        id: saved.id || saved._id,
+      };
+      setAdvancePayments((prev) => [formatted, ...prev]);
+      return formatted;
+    } catch (err) {
+      console.error('Error saving advance payment:', err);
+      const fallbackAdv = {
+        id: `ADV-${Date.now()}`,
+        ...payload,
+      };
+      setAdvancePayments((prev) => [fallbackAdv, ...prev]);
+      return fallbackAdv;
+    }
   };
 
   // Customer Financial Calculation Helpers
@@ -345,6 +526,8 @@ export const StockProvider = ({ children }) => {
       value={{
         brands,
         addBrand,
+        updateBrand,
+        deleteBrand,
         products,
         addProduct,
         updateProduct,
@@ -352,7 +535,9 @@ export const StockProvider = ({ children }) => {
         deleteProduct,
         customers,
         addCustomer,
+        updateCustomer,
         deleteCustomer,
+        fetchAllFromBackend,
         advancePayments,
         addAdvancePayment,
         purchases,

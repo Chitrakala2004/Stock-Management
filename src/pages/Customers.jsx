@@ -26,6 +26,10 @@ const Customers = () => {
     customers: contextCustomers = [],
     purchases: contextPurchases = [],
     advancePayments: contextAdvances = [],
+    addCustomer,
+    updateCustomer,
+    deleteCustomer,
+    addAdvancePayment,
     getCustomerTotalAdvance,
     getCustomerTotalPurchases,
   } = stockContext || {};
@@ -94,18 +98,15 @@ const Customers = () => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Add Customer Submit
-  const handleAddCustomer = (e) => {
+  // Add Customer Submit (Saves to MongoDB Atlas)
+  const handleAddCustomer = async (e) => {
     e.preventDefault();
     if (!formData.name || !formData.phone) return;
 
-    const nextNumber = customers.length + 1;
-    const newId = `#${String(nextNumber).padStart(4, '0')}`;
     const debitVal = parseFloat(formData.debit) || 0;
     const creditVal = parseFloat(formData.credit) || 0;
 
-    const newCust = {
-      id: newId,
+    const newCustPayload = {
       name: formData.name.toUpperCase(),
       gst: formData.gst ? formData.gst.toUpperCase() : 'N/A',
       address: formData.address ? formData.address.toUpperCase() : 'N/A',
@@ -114,6 +115,25 @@ const Customers = () => {
       debit: debitVal,
       credit: creditVal,
     };
+
+    let savedCust;
+    if (addCustomer) {
+      savedCust = await addCustomer(newCustPayload);
+    } else {
+      savedCust = { id: `CUST-${Date.now()}`, ...newCustPayload };
+      setCustomers((prev) => [savedCust, ...prev]);
+    }
+
+    if (creditVal > 0 && addAdvancePayment && savedCust) {
+      await addAdvancePayment({
+        customerId: savedCust.id || savedCust.customId || savedCust._id,
+        customerName: savedCust.name,
+        amount: creditVal,
+        date: new Date().toISOString().split('T')[0],
+        paymentReference: `PAY-${Math.floor(1000 + Math.random() * 9000)}`,
+        paymentMethod: 'Cash',
+      });
+    }
 
     const initialTx = [];
     if (debitVal > 0) {
@@ -135,9 +155,9 @@ const Customers = () => {
       });
     }
 
-    setCustomers([newCust, ...customers]);
-    if (initialTx.length > 0) {
-      setTransactions((prev) => ({ ...prev, [newId]: initialTx }));
+    if (initialTx.length > 0 && savedCust) {
+      const targetId = savedCust.id || savedCust.customId || savedCust._id;
+      setTransactions((prev) => ({ ...prev, [targetId]: initialTx }));
     }
 
     setFormData({ name: '', gst: '', address: '', phone: '', email: '', debit: '', credit: '' });
@@ -160,24 +180,27 @@ const Customers = () => {
     setIsEditModalOpen(true);
   };
 
-  const handleUpdateCustomer = (e) => {
+  const handleUpdateCustomer = async (e) => {
     e.preventDefault();
     if (!editCustomer) return;
 
-    setCustomers(
-      customers.map((c) =>
-        c.id === editCustomer.id
-          ? {
-              ...c,
-              name: formData.name.toUpperCase(),
-              gst: formData.gst.toUpperCase(),
-              address: formData.address.toUpperCase(),
-              phone: formData.phone,
-              email: formData.email,
-              debit: parseFloat(formData.debit) || 0,
-              credit: parseFloat(formData.credit) || 0,
-            }
-          : c
+    const updatePayload = {
+      name: formData.name.toUpperCase(),
+      gst: formData.gst ? formData.gst.toUpperCase() : 'N/A',
+      address: formData.address ? formData.address.toUpperCase() : 'N/A',
+      phone: formData.phone,
+      email: formData.email,
+      debit: parseFloat(formData.debit) || 0,
+      credit: parseFloat(formData.credit) || 0,
+    };
+
+    if (updateCustomer) {
+      await updateCustomer(editCustomer.id, updatePayload);
+    }
+
+    setCustomers((prev) =>
+      prev.map((c) =>
+        c.id === editCustomer.id ? { ...c, ...updatePayload } : c
       )
     );
 
@@ -185,11 +208,14 @@ const Customers = () => {
     setEditCustomer(null);
   };
 
-  // Delete Customer
-  const handleDelete = (id, e) => {
+  // Delete Customer (MongoDB)
+  const handleDelete = async (id, e) => {
     if (e) e.stopPropagation();
     if (window.confirm('Are you sure you want to delete this customer entry?')) {
-      setCustomers(customers.filter((c) => c.id !== id));
+      if (deleteCustomer) {
+        await deleteCustomer(id);
+      }
+      setCustomers((prev) => prev.filter((c) => c.id !== id));
       if (selectedCustomer?.id === id) setSelectedCustomer(null);
     }
   };
@@ -209,13 +235,24 @@ const Customers = () => {
   };
 
   // Submit Payment/Credit or Debit Entry
-  const handlePaymentSubmit = (e) => {
+  const handlePaymentSubmit = async (e) => {
     e.preventDefault();
     if (!selectedCustomer || !paymentForm.amount) return;
 
     const amt = parseFloat(paymentForm.amount) || 0;
     const isCredit = paymentForm.type === 'credit';
     const today = new Date().toISOString().split('T')[0];
+
+    if (isCredit && addAdvancePayment) {
+      await addAdvancePayment({
+        customerId: selectedCustomer.id,
+        customerName: selectedCustomer.name,
+        amount: amt,
+        date: today,
+        paymentReference: paymentForm.ref || `PAY-${Math.floor(1000 + Math.random() * 9000)}`,
+        paymentMethod: paymentForm.paymentMethod || 'UPI',
+      });
+    }
 
     // Update customer debit/credit balance
     setCustomers(

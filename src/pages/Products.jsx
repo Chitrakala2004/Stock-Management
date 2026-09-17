@@ -11,7 +11,12 @@ import {
 import Modal from '../components/Modal';
 
 const Products = () => {
-  const { products: contextProducts = [] } = useStock();
+  const {
+    products: contextProducts = [],
+    addProduct,
+    updateProduct,
+    deleteProduct,
+  } = useStock();
   const [products, setProducts] = useState([]);
 
   useEffect(() => {
@@ -33,16 +38,16 @@ const Products = () => {
     setFormData({ name: e.target.value });
   };
 
-  const handleAddProduct = (e) => {
+  const handleAddProduct = async (e) => {
     e.preventDefault();
     if (!formData.name.trim()) return;
 
-    const newProduct = {
-      id: Date.now(),
-      name: formData.name.trim(),
-    };
+    if (addProduct) {
+      await addProduct({
+        name: formData.name.trim(),
+      });
+    }
 
-    setProducts([newProduct, ...products]);
     setFormData({ name: '' });
     setIsAddModalOpen(false);
   };
@@ -53,9 +58,17 @@ const Products = () => {
     setIsEditModalOpen(true);
   };
 
-  const handleUpdateProduct = (e) => {
+  const handleUpdateProduct = async (e) => {
     e.preventDefault();
     if (!editingProduct || !formData.name.trim()) return;
+
+    if (updateProduct) {
+      await updateProduct({
+        id: editingProduct.id,
+        _id: editingProduct._id,
+        name: formData.name.trim(),
+      });
+    }
 
     setProducts(
       products.map((p) =>
@@ -67,9 +80,12 @@ const Products = () => {
     setEditingProduct(null);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this product?')) {
-      setProducts(products.filter((p) => p.id !== id));
+      if (deleteProduct) {
+        await deleteProduct(id);
+      }
+      setProducts(products.filter((p) => p.id !== id && p._id !== id));
     }
   };
 

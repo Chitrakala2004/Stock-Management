@@ -4,11 +4,12 @@ const productSchema = new mongoose.Schema(
   {
     brand: {
       type: String,
-      required: [true, 'Please add brand name'],
+      default: 'Standard Crackers',
     },
     name: {
       type: String,
       required: [true, 'Please add product name'],
+      trim: true,
     },
     category: {
       type: String,
@@ -20,19 +21,18 @@ const productSchema = new mongoose.Schema(
     },
     pricePerPiece: {
       type: Number,
-      required: [true, 'Please add price per piece'],
+      default: 10,
       min: 0,
     },
     piecesPerCase: {
       type: Number,
-      required: [true, 'Please add pieces per case'],
+      default: 10,
       min: 1,
     },
     availableCases: {
       type: Number,
-      required: [true, 'Please add available case quantity'],
+      default: 50,
       min: 0,
-      default: 0,
     },
     minStockCases: {
       type: Number,
