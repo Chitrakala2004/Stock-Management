@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useStock } from '../context/StockContext';
 import {
   Search,
   Plus,
@@ -19,85 +20,37 @@ import {
 } from 'lucide-react';
 import Modal from '../components/Modal';
 
-const initialCustomers = [
-  {
-    id: '#0007',
-    name: 'SAI MOHAN MARKETING',
-    gst: '22ADWPN7742F1Z7',
-    address: 'CHHATTISGARH',
-    phone: '86020 05900',
-    debit: 307506.00,
-    credit: 307500.00,
-    email: 'saimohan@marketing.com',
-  },
-  {
-    id: '#0001',
-    name: 'SRI SAI TRADERS',
-    gst: '33AAACR1234F1Z1',
-    address: 'TAMIL NADU',
-    phone: '98765 43210',
-    debit: 150000.00,
-    credit: 150000.00,
-    email: 'rajesh@saisai.com',
-  },
-  {
-    id: '#0002',
-    name: 'SHARMA CRACKERS STORE',
-    gst: '27AABCS5678G2Z3',
-    address: 'MAHARASHTRA',
-    phone: '98456 12370',
-    debit: 225000.00,
-    credit: 200000.00,
-    email: 'sunita@sharmacrackers.in',
-  },
-  {
-    id: '#0003',
-    name: 'MEENA STORES & FIREWORKS',
-    gst: '36AAAFM9012H1Z5',
-    address: 'TELANGANA',
-    phone: '91234 56790',
-    debit: 85000.00,
-    credit: 85000.00,
-    email: 'meena@stores.com',
-  },
-  {
-    id: '#0004',
-    name: 'DEEPAVALI MART ENTERPRISES',
-    gst: '29AAACD3456J1Z8',
-    address: 'KARNATAKA',
-    phone: '99887 76655',
-    debit: 420000.00,
-    credit: 400000.00,
-    email: 'priya@deepavalimart.com',
-  },
-];
-
-const customerTransactionsMap = {
-  '#0007': [
-    { date: '2024-09-15', ref: 'INV-2024-098', desc: 'Crackers Purchase (Ground Chakkars & Sparklers)', type: 'debit', amount: 307506.00 },
-    { date: '2024-09-10', ref: 'PAY-2024-045', desc: 'Advance Payment Received via NEFT', type: 'credit', amount: 307500.00 },
-  ],
-  '#0001': [
-    { date: '2024-09-12', ref: 'INV-2024-080', desc: 'Standard Fireworks Cases Purchase', type: 'debit', amount: 150000.00 },
-    { date: '2024-09-01', ref: 'PAY-2024-012', desc: 'Full Payment via UPI', type: 'credit', amount: 150000.00 },
-  ],
-  '#0002': [
-    { date: '2024-09-14', ref: 'INV-2024-092', desc: 'Gift Boxes & Aerial Fountain Stock', type: 'debit', amount: 225000.00 },
-    { date: '2024-09-05', ref: 'PAY-2024-030', desc: 'Part Payment via Bank Transfer', type: 'credit', amount: 200000.00 },
-  ],
-  '#0003': [
-    { date: '2024-09-10', ref: 'INV-2024-071', desc: 'Mixed Cartons Stock Order', type: 'debit', amount: 85000.00 },
-    { date: '2024-09-02', ref: 'PAY-2024-015', desc: 'Cash Payment Received', type: 'credit', amount: 85000.00 },
-  ],
-  '#0004': [
-    { date: '2024-09-16', ref: 'INV-2024-101', desc: 'Family Pack Cartons & Rockets Order', type: 'debit', amount: 420000.00 },
-    { date: '2024-09-08', ref: 'PAY-2024-052', desc: 'Advance Transfer Received', type: 'credit', amount: 400000.00 },
-  ],
-};
-
 const Customers = () => {
-  const [customers, setCustomers] = useState(initialCustomers);
-  const [transactions, setTransactions] = useState(customerTransactionsMap);
+  const stockContext = useStock();
+  const {
+    customers: contextCustomers = [],
+    purchases: contextPurchases = [],
+    advancePayments: contextAdvances = [],
+    getCustomerTotalAdvance,
+    getCustomerTotalPurchases,
+  } = stockContext || {};
+
+  const [customers, setCustomers] = useState([]);
+  const [transactions, setTransactions] = useState({});
+
+  useEffect(() => {
+    if (contextCustomers && contextCustomers.length > 0) {
+      setCustomers(
+        contextCustomers.map((c) => ({
+          id: c.customId || c.id || c._id,
+          name: c.name,
+          phone: c.phone || 'N/A',
+          gst: c.gst || 'N/A',
+          address: c.address || 'N/A',
+          debit: getCustomerTotalPurchases ? getCustomerTotalPurchases(c.id) : (c.debit || 0),
+          credit: getCustomerTotalAdvance ? getCustomerTotalAdvance(c.id) : (c.credit || 0),
+          email: c.email || '',
+        }))
+      );
+    } else {
+      setCustomers([]);
+    }
+  }, [contextCustomers, contextPurchases, contextAdvances]);
   const [search, setSearch] = useState('');
 
   // Modals

@@ -1,45 +1,77 @@
 const mongoose = require('mongoose');
 
 const purchaseItemSchema = new mongoose.Schema({
-  brand: { type: String, required: true },
-  productName: { type: String, required: true },
-  productId: { type: String, required: true },
-  casesPurchased: { type: Number, required: true, min: 1 },
-  piecesPerCase: { type: Number, required: true }, // Snapshot at purchase time
-  pricePerPiece: { type: Number, required: true }, // Snapshot at purchase time
-  totalPieces: { type: Number, required: true },   // casesPurchased * piecesPerCase
-  totalAmount: { type: Number, required: true },   // totalPieces * pricePerPiece
+  particular: { type: String },
+  caseCount: { type: Number },
+  rate: { type: Number },
+  pktUnits: { type: Number },
+  totalUnits: { type: Number },
+  amount: { type: Number },
+  rateMode: { type: String },
 });
 
 const purchaseSchema = new mongoose.Schema(
   {
-    purchaseNumber: {
+    purchaseId: {
       type: String,
-      required: true,
-      unique: true,
     },
-    customerId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Customer',
-      required: true,
+    billNo: {
+      type: String,
+    },
+    customer: {
+      type: String,
     },
     customerName: {
       type: String,
-      required: true,
     },
-    purchaseDate: {
+    companyName: {
       type: String,
-      required: true,
+      default: 'SIMBA FW',
+    },
+    date: {
+      type: String,
+    },
+    subtotal: {
+      type: Number,
+      default: 0,
+    },
+    discount: {
+      type: Number,
+      default: 0,
+    },
+    packing: {
+      type: Number,
+      default: 0,
+    },
+    tax: {
+      type: Number,
+      default: 0,
+    },
+    netTotal: {
+      type: Number,
+      default: 0,
+    },
+    transport: {
+      type: Number,
+      default: 0,
+    },
+    debit: {
+      type: Number,
+      default: 0,
+    },
+    credit: {
+      type: Number,
+      default: 0,
+    },
+    netBalance: {
+      type: Number,
+      default: 0,
     },
     status: {
       type: String,
       default: 'Confirmed',
     },
     items: [purchaseItemSchema],
-    totalPurchaseAmount: {
-      type: Number,
-      required: true,
-    },
   },
   {
     timestamps: true,

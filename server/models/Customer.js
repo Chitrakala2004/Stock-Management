@@ -2,6 +2,9 @@ const mongoose = require('mongoose');
 
 const customerSchema = new mongoose.Schema(
   {
+    customId: {
+      type: String,
+    },
     name: {
       type: String,
       required: [true, 'Please add customer name'],
@@ -9,12 +12,25 @@ const customerSchema = new mongoose.Schema(
     },
     phone: {
       type: String,
-      required: [true, 'Please add customer mobile number'],
       trim: true,
+      default: '',
     },
-    email: {
+    gst: {
       type: String,
       trim: true,
+      default: '',
+    },
+    address: {
+      type: String,
+      default: '',
+    },
+    debit: {
+      type: Number,
+      default: 0,
+    },
+    credit: {
+      type: Number,
+      default: 0,
     },
     status: {
       type: String,

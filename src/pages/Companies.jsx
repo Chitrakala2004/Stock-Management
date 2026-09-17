@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useStock } from '../context/StockContext';
 import {
   Search,
   Plus,
@@ -10,17 +11,24 @@ import {
 } from 'lucide-react';
 import Modal from '../components/Modal';
 
-const initialCompanies = [
-  { id: 1, name: 'Standard Fireworks Ltd', address: 'Sivakasi, Tamil Nadu - 626123', gst: '33AABCS1234L1Z5' },
-  { id: 2, name: 'Sri Kaliswari Fireworks', address: 'Sivakasi, Tamil Nadu - 626189', gst: '33AABCS5678M2Z3' },
-  { id: 3, name: 'Coronation Fireworks', address: 'Main Road, Sivakasi, Tamil Nadu - 626123', gst: '33AABCM9012N3Z1' },
-  { id: 4, name: 'Vadivel Pyrotechnics', address: 'Industrial Estate, Sivakasi, Tamil Nadu - 626124', gst: '33AABCP3456O4Z9' },
-  { id: 5, name: 'Metal Powder Crackers Co.', address: 'Ring Road, Sivakasi, Tamil Nadu - 626123', gst: '33AABCM7890P5Z2' },
-  { id: 6, name: 'Ayyan Fireworks', address: 'Vembakottai Road, Sivakasi, Tamil Nadu - 626131', gst: '33AABCA4321Q6Z8' },
-];
-
 const Companies = () => {
-  const [companies, setCompanies] = useState(initialCompanies);
+  const { brands = [], addBrand } = useStock();
+  const [companies, setCompanies] = useState([]);
+
+  useEffect(() => {
+    if (brands && brands.length > 0) {
+      setCompanies(
+        brands.map((b, idx) => ({
+          id: b.id || b._id || idx + 1,
+          name: typeof b === 'string' ? b : b.name,
+          address: b.address || 'Sivakasi, Tamil Nadu',
+          gst: b.gst || '33AABCS1234L1Z5',
+        }))
+      );
+    } else {
+      setCompanies([]);
+    }
+  }, [brands]);
   const [search, setSearch] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);

@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useStock } from '../context/StockContext';
 import {
   Search,
   Plus,
@@ -9,18 +10,17 @@ import {
 } from 'lucide-react';
 import Modal from '../components/Modal';
 
-const initialProducts = [
-  { id: 1, name: '10cm Electric Sparklers (10 Pkts Box)' },
-  { id: 2, name: 'Ground Chakkar Deluxe (20 Pcs Carton)' },
-  { id: 3, name: 'Special Flower Pots (Large 10 Pcs)' },
-  { id: 4, name: '30-Shot Multi Color Aerial Fountain' },
-  { id: 5, name: 'Hydro Atom Bomb (Super Sound)' },
-  { id: 6, name: 'Whistling Rockets (25 Pcs Pack)' },
-  { id: 7, name: 'Deepavali Family Gift Box (25 Items)' },
-];
-
 const Products = () => {
-  const [products, setProducts] = useState(initialProducts);
+  const { products: contextProducts = [] } = useStock();
+  const [products, setProducts] = useState([]);
+
+  useEffect(() => {
+    if (contextProducts && contextProducts.length > 0) {
+      setProducts(contextProducts);
+    } else {
+      setProducts([]);
+    }
+  }, [contextProducts]);
   const [search, setSearch] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);

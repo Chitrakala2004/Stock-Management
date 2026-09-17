@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStock } from '../context/StockContext';
 import {
   User,
@@ -17,46 +17,9 @@ import {
   ChevronDown,
   Building2,
   Check,
+  X,
+  FileText,
 } from 'lucide-react';
-
-const initialCustomers = [
-  {
-    id: 'CUST-101',
-    name: 'SAI MOHAN MARKETING',
-    phone: '86020 05900',
-    gst: '22ADWPN7742F1Z7',
-    address: 'Plot No. 45, Commercial Complex, Raipur, Chhattisgarh - 492001',
-    debit: 307506.00,
-    credit: 307500.00,
-  },
-  {
-    id: 'CUST-102',
-    name: 'SRI SAI TRADERS',
-    phone: '98765 43210',
-    gst: '33AAACR1234F1Z1',
-    address: 'Main Market Road, Sivakasi, Tamil Nadu - 626123',
-    debit: 150000.00,
-    credit: 150000.00,
-  },
-  {
-    id: 'CUST-103',
-    name: 'SHARMA CRACKERS STORE',
-    phone: '98456 12370',
-    gst: '27AABCS5678G2Z3',
-    address: 'Station Road, Mumbai, Maharashtra - 400001',
-    debit: 225000.00,
-    credit: 200000.00,
-  },
-  {
-    id: 'CUST-104',
-    name: 'MEENA STORES & FIREWORKS',
-    phone: '91234 56790',
-    gst: '36AAAFM9012H1Z5',
-    address: 'Market Yard, Hyderabad, Telangana - 500001',
-    debit: 85000.00,
-    credit: 85000.00,
-  },
-];
 
 const particularOptions = [
   '20 SKY SHOT',
@@ -88,222 +51,78 @@ const companyOptions = [
   'SRI KALISWARI FIREWORKS',
 ];
 
-const initialTransactions = [
-  {
-    id: 'TXN-101',
-    customerId: 'CUST-101',
-    customerName: 'SAI MOHAN MARKETING',
-    date: '10-09-2026',
-    companyName: 'SIMBA FW',
-    debit: 307506.00,
-    credit: 0.00,
-    balance: 307506.00,
-  },
-  {
-    id: 'TXN-102',
-    customerId: 'CUST-101',
-    customerName: 'SAI MOHAN MARKETING',
-    date: '12-09-2026',
-    companyName: 'SIMBA FW',
-    debit: 0.00,
-    credit: 307500.00,
-    balance: 6.00,
-  },
-  {
-    id: 'TXN-103',
-    customerId: 'CUST-102',
-    customerName: 'SRI SAI TRADERS',
-    date: '08-09-2026',
-    companyName: 'STANDARD FIREWORKS',
-    debit: 150000.00,
-    credit: 0.00,
-    balance: 150000.00,
-  },
-  {
-    id: 'TXN-104',
-    customerId: 'CUST-102',
-    customerName: 'SRI SAI TRADERS',
-    date: '14-09-2026',
-    companyName: 'STANDARD FIREWORKS',
-    debit: 0.00,
-    credit: 150000.00,
-    balance: 0.00,
-  },
-  {
-    id: 'TXN-105',
-    customerId: 'CUST-103',
-    customerName: 'SHARMA CRACKERS STORE',
-    date: '05-09-2026',
-    companyName: 'AJANTA BRAND',
-    debit: 225000.00,
-    credit: 0.00,
-    balance: 225000.00,
-  },
-  {
-    id: 'TXN-106',
-    customerId: 'CUST-103',
-    customerName: 'SHARMA CRACKERS STORE',
-    date: '15-09-2026',
-    companyName: 'AJANTA BRAND',
-    debit: 0.00,
-    credit: 200000.00,
-    balance: 25000.00,
-  },
-  {
-    id: 'TXN-107',
-    customerId: 'CUST-104',
-    customerName: 'MEENA STORES & FIREWORKS',
-    date: '01-09-2026',
-    companyName: 'AYYAN FIREWORKS',
-    debit: 85000.00,
-    credit: 0.00,
-    balance: 85000.00,
-  },
-  {
-    id: 'TXN-108',
-    customerId: 'CUST-104',
-    customerName: 'MEENA STORES & FIREWORKS',
-    date: '16-09-2026',
-    companyName: 'AYYAN FIREWORKS',
-    debit: 0.00,
-    credit: 85000.00,
-    balance: 0.00,
-  },
-];
-
-const initialPerformoBills = [
-  {
-    id: 'PRF-BILL-101',
-    purchaseId: 'PRF-101',
-    billNo: '101',
-    customer: 'SAI MOHAN MARKETING',
-    companyName: 'SIMBA FW',
-    date: '17-09-2026',
-    subtotal: 300000.00,
-    discount: 15000.00,
-    packing: 6000.00,
-    tax: 15000.00,
-    netTotal: 307506.00,
-    transport: 1506.00,
-    debit: 307506.00,
-    credit: 307500.00,
-    netBalance: 6.00,
-  },
-  {
-    id: 'PRF-BILL-102',
-    purchaseId: 'PRF-102',
-    billNo: '102',
-    customer: 'SRI SAI TRADERS',
-    companyName: 'STANDARD FIREWORKS',
-    date: '14-09-2026',
-    subtotal: 150000.00,
-    discount: 5000.00,
-    packing: 3000.00,
-    tax: 0.00,
-    netTotal: 150000.00,
-    transport: 2000.00,
-    debit: 150000.00,
-    credit: 150000.00,
-    netBalance: 0.00,
-  },
-  {
-    id: 'PRF-BILL-103',
-    purchaseId: 'PRF-103',
-    billNo: '103',
-    customer: 'SHARMA CRACKERS STORE',
-    companyName: 'AJANTA BRAND',
-    date: '12-09-2026',
-    subtotal: 220000.00,
-    discount: 10000.00,
-    packing: 5000.00,
-    tax: 7000.00,
-    netTotal: 225000.00,
-    transport: 3000.00,
-    debit: 225000.00,
-    credit: 200000.00,
-    netBalance: 25000.00,
-  },
-  {
-    id: 'PRF-BILL-104',
-    purchaseId: 'PRF-104',
-    billNo: '104',
-    customer: 'MEENA STORES & FIREWORKS',
-    companyName: 'AYYAN FIREWORKS',
-    date: '10-09-2026',
-    subtotal: 85000.00,
-    discount: 2000.00,
-    packing: 1000.00,
-    tax: 0.00,
-    netTotal: 85000.00,
-    transport: 1000.00,
-    debit: 85000.00,
-    credit: 85000.00,
-    netBalance: 0.00,
-  },
-];
-
-const initialCreditEntries = [
-  {
-    id: 'CRD-101',
-    customerName: 'SAI MOHAN MARKETING',
-    companyName: 'SIMBA FW',
-    creditAmt: 307500.00,
-    paymentMethod: 'Bank Transfer',
-    paymentRefId: 'TXN-BNK-984210',
-    date: '12-09-2026',
-  },
-  {
-    id: 'CRD-102',
-    customerName: 'SRI SAI TRADERS',
-    companyName: 'STANDARD FIREWORKS',
-    creditAmt: 150000.00,
-    paymentMethod: 'UPI',
-    paymentRefId: 'UPI-77412098',
-    date: '14-09-2026',
-  },
-  {
-    id: 'CRD-103',
-    customerName: 'SHARMA CRACKERS STORE',
-    companyName: 'AJANTA BRAND',
-    creditAmt: 200000.00,
-    paymentMethod: 'Cheque',
-    paymentRefId: 'CHQ-885412',
-    date: '15-09-2026',
-  },
-  {
-    id: 'CRD-104',
-    customerName: 'MEENA STORES & FIREWORKS',
-    companyName: 'AYYAN FIREWORKS',
-    creditAmt: 85000.00,
-    paymentMethod: 'Cash',
-    paymentRefId: 'CASH-REC-041',
-    date: '16-09-2026',
-  },
-];
-
 const PurchaseEntry = () => {
   const stockContext = useStock();
   const {
     customers: contextCustomers = [],
+    purchases: contextPurchases = [],
+    advancePayments: contextAdvances = [],
+    stockTransactions: contextTransactions = [],
+    products: contextProducts = [],
     getCustomerRemainingAdvance = () => 0,
     getCustomerTotalAdvance = () => 0,
     addAdvancePayment,
+    selectedCustomerIdForStatement,
+    targetPerformoTab,
+    clearCustomerStatementNav,
   } = stockContext || {};
 
-  // Local Customer Data synced with Context
-  const [customersList, setCustomersList] = useState(() =>
-    contextCustomers.length > 0
-      ? contextCustomers.map((c) => ({
-          id: c.id,
+  // Sync Live Data from Context (MongoDB)
+  const [customersList, setCustomersList] = useState([]);
+  const [transactions, setTransactions] = useState([]);
+  const [performoBills, setPerformoBills] = useState([]);
+  const [creditEntries, setCreditEntries] = useState([]);
+
+  useEffect(() => {
+    if (contextCustomers && contextCustomers.length > 0) {
+      setCustomersList(
+        contextCustomers.map((c) => ({
+          id: c.customId || c.id || c._id,
           name: c.name,
           phone: c.phone || '9876543210',
           gst: c.gst || 'N/A',
           address: c.address || 'Delivery Address Not Specified',
-          debit: stockContext?.getCustomerTotalPurchases(c.id) || 0,
-          credit: stockContext?.getCustomerTotalAdvance(c.id) || 0,
+          debit: c.debit || stockContext?.getCustomerTotalPurchases(c.id) || 0,
+          credit: c.credit || stockContext?.getCustomerTotalAdvance(c.id) || 0,
         }))
-      : initialCustomers
-  );
+      );
+    }
+  }, [contextCustomers]);
+
+  useEffect(() => {
+    if (contextPurchases && contextPurchases.length > 0) {
+      setPerformoBills(
+        contextPurchases.map((p) => ({
+          ...p,
+          id: p.id || p._id,
+          customer: p.customer || p.customerName,
+        }))
+      );
+    }
+  }, [contextPurchases]);
+
+  useEffect(() => {
+    if (contextAdvances && contextAdvances.length > 0) {
+      setCreditEntries(
+        contextAdvances.map((a) => ({
+          ...a,
+          id: a.id || a._id,
+          creditAmt: a.creditAmt || a.amount,
+        }))
+      );
+    }
+  }, [contextAdvances]);
+
+  useEffect(() => {
+    if (contextTransactions && contextTransactions.length > 0) {
+      setTransactions(
+        contextTransactions.map((t) => ({
+          ...t,
+          id: t.id || t._id,
+        }))
+      );
+    }
+  }, [contextTransactions]);
 
   // Active Sub-Tab State inside Performo Page (Default: Select Customer Account)
   const [activeTab, setActiveTab] = useState('customer');
@@ -312,11 +131,45 @@ const PurchaseEntry = () => {
   const [selectedCustomerId, setSelectedCustomerId] = useState(
     customersList[0]?.id || 'CUST-101'
   );
+
+  // Listen for Statement navigation requests from All Performo or other pages
+  useEffect(() => {
+    if (selectedCustomerIdForStatement) {
+      const match = customersList.find(
+        (c) =>
+          c.id === selectedCustomerIdForStatement ||
+          c.name.toLowerCase() === selectedCustomerIdForStatement.toLowerCase() ||
+          c.name.toLowerCase().includes(selectedCustomerIdForStatement.toLowerCase())
+      );
+      if (match) {
+        setSelectedCustomerId(match.id);
+      }
+      if (targetPerformoTab) {
+        setActiveTab(targetPerformoTab);
+      }
+      if (clearCustomerStatementNav) {
+        clearCustomerStatementNav();
+      }
+    }
+  }, [selectedCustomerIdForStatement, targetPerformoTab, customersList, clearCustomerStatementNav]);
+
+  const handleViewCustomerStatement = (customerNameOrId) => {
+    const match = customersList.find(
+      (c) =>
+        c.id === customerNameOrId ||
+        c.name.toLowerCase() === (customerNameOrId || '').toLowerCase() ||
+        c.name.toLowerCase().includes((customerNameOrId || '').toLowerCase())
+    );
+    if (match) {
+      setSelectedCustomerId(match.id);
+    }
+    setActiveTab('account');
+  };
   const [purchaseDate, setPurchaseDate] = useState('2026-09-17');
   const [customerAdvanceInput, setCustomerAdvanceInput] = useState('');
 
   // Step 2 Item Entry Row State
-  const [entryParticular, setEntryParticular] = useState('20 SKY SHOT');
+  const [entryParticular, setEntryParticular] = useState('');
   const [entryCase, setEntryCase] = useState('');
   const [entryRate, setEntryRate] = useState('');
   const [entryPktUnits, setEntryPktUnits] = useState('');
@@ -330,7 +183,7 @@ const PurchaseEntry = () => {
   const [step2Discount, setStep2Discount] = useState('');
   const [step2Transport, setStep2Transport] = useState('');
   const [step2Packing, setStep2Packing] = useState('');
-  const [step2BillNo, setStep2BillNo] = useState('');
+  const [step2BillNo, setStep2BillNo] = useState('101');
   const [step2Tax, setStep2Tax] = useState('');
   const [step2Date, setStep2Date] = useState('2026-09-17');
 
@@ -353,21 +206,58 @@ const PurchaseEntry = () => {
     desc: '',
   });
 
-  // Transactions Ledger State
-  const [transactions, setTransactions] = useState(initialTransactions);
-
-  // All Customers Performo Bills State
-  const [performoBills, setPerformoBills] = useState(initialPerformoBills);
-
   const handleDeletePerformoBill = (id) => {
     setPerformoBills(performoBills.filter((b) => b.id !== id));
   };
 
-  // Credit Payment Entries State
-  const [creditEntries, setCreditEntries] = useState(initialCreditEntries);
+  const handleEditPerformoBill = (bill) => {
+    if (!bill) return;
+    setStep2BillNo(bill.billNo || '');
+    setStep2Customer(bill.customer || '');
+    setStep2Company(bill.companyName || 'SIMBA FW');
+    setStep2Date(bill.date || '2026-09-17');
+    setStep2Discount(bill.discount ? bill.discount.toString() : '');
+    setStep2Transport(bill.transport ? bill.transport.toString() : '');
+    setStep2Packing(bill.packing ? bill.packing.toString() : '');
+    setStep2Tax(bill.tax ? bill.tax.toString() : '');
+    setActiveTab('product');
+    setFeedback({
+      type: 'success',
+      message: `Loaded Bill #${bill.billNo} into Product Entry for editing.`,
+    });
+  };
 
   const handleDeleteCreditEntry = (id) => {
     setCreditEntries(creditEntries.filter((c) => c.id !== id));
+  };
+
+  const handleEditCreditEntry = (crd) => {
+    if (!crd) return;
+    setCreditForm({
+      customerName: crd.customerName || '',
+      companyName: crd.companyName || '',
+      amount: crd.creditAmt ? crd.creditAmt.toString() : '',
+      paymentMethod: crd.paymentMethod || 'UPI',
+      ref: crd.paymentRefId || '',
+      date: crd.date || '2026-09-17',
+      desc: '',
+    });
+    setActiveTab('credit');
+    setCreditFeedback({
+      type: 'success',
+      message: `Loaded Credit Entry for "${crd.customerName}" into form for editing.`,
+    });
+  };
+
+  const handleEditTransaction = (trx) => {
+    if (!trx) return;
+    setStep2Company(trx.companyName || 'SIMBA FW');
+    setStep2Date(trx.date || '2026-09-17');
+    setActiveTab('product');
+    setFeedback({
+      type: 'success',
+      message: `Loaded Transaction for "${trx.customerName || 'Customer'}" into Product Entry for editing.`,
+    });
   };
 
   // Notifications
@@ -464,6 +354,15 @@ const PurchaseEntry = () => {
     setEntryPktUnits('');
   };
 
+  // Clear Product Entry Input Row (Cross icon action)
+  const handleClearProductInput = (e) => {
+    if (e) e.preventDefault();
+    setEntryCase('');
+    setEntryRate('');
+    setEntryPktUnits('');
+    setEditingRowIndex(null);
+  };
+
   // Edit Row
   const handleEditRow = (index) => {
     const row = productRows[index];
@@ -496,7 +395,9 @@ const PurchaseEntry = () => {
 
   // Dynamic Reductions as products are added/accumulated in table
   const dynamicRemainingCases = initialCasesAllocated - totalAddedCases;
-  const dynamicRemainingAdvance = initialAdvanceAmt - subtotalAmount;
+  const dynamicRemainingAdvance = initialAdvanceAmt > 0
+    ? Math.max(0, initialAdvanceAmt - subtotalAmount)
+    : 0;
 
   const discountVal = parseFloat(step2Discount) || 0;
   const transportVal = parseFloat(step2Transport) || 0;
@@ -512,14 +413,15 @@ const PurchaseEntry = () => {
     subtotalAmount - discountAmount + packingAmount + transportVal + taxAmount;
 
   // Create Performo Invoice
-  const handleCreateInvoice = () => {
-    if (!step2BillNo.trim()) {
-      setFeedback({
-        type: 'error',
-        message: 'Bill No * is required. Please enter a valid Bill No.',
-      });
-      return;
+  const handleCreateInvoice = (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+
+    let currentBillNo = step2BillNo.trim();
+    if (!currentBillNo) {
+      currentBillNo = (101 + performoBills.length).toString();
+      setStep2BillNo(currentBillNo);
     }
+
     if (productRows.length === 0) {
       setFeedback({
         type: 'error',
@@ -528,19 +430,30 @@ const PurchaseEntry = () => {
       return;
     }
 
-    setCustomersList(
-      customersList.map((c) =>
-        c.id === activeCustomer.id
-          ? { ...c, debit: c.debit + grandTotalAmount }
-          : c
-      )
-    );
+    const targetCustomerName =
+      step2Customer && step2Customer !== 'SAI MOHAN M...'
+        ? step2Customer
+        : activeCustomer
+        ? activeCustomer.name
+        : 'SAI MOHAN MARKETING';
 
+    // 1. Update customer debit balance
+    if (activeCustomer) {
+      setCustomersList((prev) =>
+        prev.map((c) =>
+          c.id === activeCustomer.id
+            ? { ...c, debit: c.debit + grandTotalAmount }
+            : c
+        )
+      );
+    }
+
+    // 2. Add new Performo Bill
     const newBill = {
       id: `PRF-BILL-${Date.now()}`,
-      purchaseId: `PRF-${step2BillNo}`,
-      billNo: step2BillNo,
-      customer: step2Customer && step2Customer !== 'SAI MOHAN M...' ? step2Customer : activeCustomer.name,
+      purchaseId: `PRF-${currentBillNo}`,
+      billNo: currentBillNo,
+      customer: targetCustomerName,
       companyName: step2Company || 'SIMBA FW',
       date: step2Date || purchaseDate,
       subtotal: subtotalAmount,
@@ -555,11 +468,32 @@ const PurchaseEntry = () => {
     };
     setPerformoBills((prev) => [newBill, ...prev]);
 
+    // 3. Add to ledger transactions history
+    const newTxn = {
+      id: `TXN-${Date.now()}`,
+      customerId: activeCustomer ? activeCustomer.id : 'CUST-101',
+      customerName: targetCustomerName,
+      date: step2Date || purchaseDate,
+      companyName: step2Company || 'SIMBA FW',
+      debit: grandTotalAmount,
+      credit: 0.00,
+      balance: (activeCustomer ? activeCustomer.debit : 0) + grandTotalAmount,
+    };
+    setTransactions((prev) => [newTxn, ...prev]);
+
     setFeedback({
       type: 'success',
-      message: `✅ Bill #${step2BillNo} Created Successfully!`,
-      details: `${formatCurrency(grandTotalAmount)} billed to ${step2Customer || activeCustomer.name} (Company: ${step2Company}). Date: ${step2Date}.`,
+      message: `✅ Bill #${currentBillNo} Created Successfully!`,
+      details: `${formatCurrency(grandTotalAmount)} billed to ${targetCustomerName} (Company: ${step2Company || 'SIMBA FW'}). Switched to Performo Details.`,
     });
+
+    // Reset product rows and increment bill number for next bill
+    setProductRows([]);
+    const nextBillNo = (parseInt(currentBillNo, 10) + 1 || 102).toString();
+    setStep2BillNo(nextBillNo);
+
+    // Auto-navigate to Performo Details tab to show created bill
+    setActiveTab('performo');
   };
 
   // Save Performo Order (Step 4 legacy)
@@ -830,14 +764,15 @@ const PurchaseEntry = () => {
             <div className="md:col-span-4">
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
                 <span>Total Ordered Cases</span>
-                <span className="text-[10px] font-semibold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">Auto Calculated</span>
+                <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">Manual Entry</span>
               </label>
               <input
                 type="number"
-                readOnly
-                placeholder="0 Cases"
-                value={totalAddedCases}
-                className="w-full px-4 py-3 bg-slate-100 border border-slate-200 rounded-xl text-sm font-bold text-blue-700 focus:outline-none shadow-2xs cursor-not-allowed"
+                min="0"
+                placeholder="Enter Total Cases (e.g. 10)"
+                value={step2CaseCount}
+                onChange={(e) => setStep2CaseCount(e.target.value)}
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 shadow-2xs"
               />
             </div>
 
@@ -933,29 +868,45 @@ const PurchaseEntry = () => {
               <label className="block text-xs font-bold text-slate-700 mb-1">
                 Particular
               </label>
-              <div className="relative">
+              <div className="relative flex items-center">
                 <select
                   value={entryParticular}
-                  onChange={(e) => {
-                    const selected = e.target.value;
-                    setEntryParticular(selected);
-                    if (defaultProductDetails[selected]) {
-                      if (!entryRate) setEntryRate(defaultProductDetails[selected].rate.toString());
-                      if (!entryPktUnits) setEntryPktUnits(defaultProductDetails[selected].pktUnits.toString());
-                    }
-                  }}
-                  className="w-full pl-3 pr-8 py-2.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 cursor-pointer shadow-2xs appearance-none"
+                  onChange={(e) => setEntryParticular(e.target.value)}
+                  className="w-full pl-3 pr-14 py-2.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 cursor-pointer shadow-2xs appearance-none"
                 >
+                  <option value="">-- Select Product --</option>
                   {particularOptions.map((opt) => (
                     <option key={opt} value={opt}>
                       {opt}
                     </option>
                   ))}
                 </select>
-                <ChevronDown
-                  size={14}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
-                />
+
+                {/* Inner Action Group: Cross Clear Icon + Dropdown Arrow */}
+                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                  {entryParticular && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setEntryParticular('');
+                        setEntryCase('');
+                        setEntryRate('');
+                        setEntryPktUnits('');
+                        setEditingRowIndex(null);
+                      }}
+                      title="Clear"
+                      className="w-5 h-5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-all cursor-pointer shadow-2xs"
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                  <ChevronDown
+                    size={14}
+                    className="text-slate-400 pointer-events-none"
+                  />
+                </div>
               </div>
             </div>
 
@@ -1309,6 +1260,7 @@ const PurchaseEntry = () => {
 
               {/* Blue gradient Create Button */}
               <button
+                type="button"
                 onClick={handleCreateInvoice}
                 className="w-full sm:w-1/2 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs rounded-xl transition-all shadow-sm cursor-pointer flex items-center justify-center gap-1.5"
               >
@@ -1410,7 +1362,7 @@ const PurchaseEntry = () => {
                 <th className="py-3 px-4 font-bold text-slate-700 uppercase">DEBIT</th>
                 <th className="py-3 px-4 font-bold text-slate-700 uppercase">CREDIT</th>
                 <th className="py-3 px-4 font-bold text-slate-700 uppercase">BALANCE</th>
-                <th className="py-3 px-4 font-bold text-slate-700 uppercase text-center">DELETE</th>
+                <th className="py-3 px-4 font-bold text-slate-700 uppercase text-center">ACTION</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 bg-white">
@@ -1438,13 +1390,22 @@ const PurchaseEntry = () => {
                     {formatCurrency(trx.balance)}
                   </td>
                   <td className="py-3.5 px-4 text-center">
-                    <button
-                      onClick={() => handleDeleteTransaction(trx.id)}
-                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                      title="Delete Transaction"
-                    >
-                      <Trash2 size={15} />
-                    </button>
+                    <div className="flex items-center justify-center gap-2">
+                      <button
+                        onClick={() => handleEditTransaction(trx)}
+                        className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                        title="Edit Transaction"
+                      >
+                        <Pencil size={15} />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteTransaction(trx.id)}
+                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                        title="Delete Transaction"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -1529,13 +1490,30 @@ const PurchaseEntry = () => {
                     {bill.transport > 0 ? formatCurrency(bill.transport) : '-'}
                   </td>
                   <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                    <button
-                      onClick={() => handleDeletePerformoBill(bill.id)}
-                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                      title="Delete Bill"
-                    >
-                      <Trash2 size={15} />
-                    </button>
+                    <div className="flex items-center justify-center gap-2">
+                      <button
+                        onClick={() => handleViewCustomerStatement(bill.customer)}
+                        className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold border border-blue-200 rounded-lg transition-all cursor-pointer flex items-center gap-1 text-[11px]"
+                        title="View Account Details Statement"
+                      >
+                        <FileText size={13} />
+                        <span>Statement</span>
+                      </button>
+                      <button
+                        onClick={() => handleEditPerformoBill(bill)}
+                        className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                        title="Edit Bill"
+                      >
+                        <Pencil size={15} />
+                      </button>
+                      <button
+                        onClick={() => handleDeletePerformoBill(bill.id)}
+                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                        title="Delete Bill"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -1784,13 +1762,22 @@ const PurchaseEntry = () => {
                       {crd.date}
                     </td>
                     <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                      <button
-                        onClick={() => handleDeleteCreditEntry(crd.id)}
-                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                        title="Delete Credit Entry"
-                      >
-                        <Trash2 size={15} />
-                      </button>
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => handleEditCreditEntry(crd)}
+                          className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                          title="Edit Credit Entry"
+                        >
+                          <Pencil size={15} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteCreditEntry(crd.id)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                          title="Delete Credit Entry"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

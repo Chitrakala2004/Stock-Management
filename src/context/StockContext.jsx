@@ -1,340 +1,79 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import {
+  customerService,
+  productService,
+  brandService,
+  purchaseService,
+  advanceService,
+  transactionService,
+} from '../services/api';
 
 const StockContext = createContext();
 
-// Seed Brands
-const initialBrands = [
-  'Standard Crackers',
-  'Ajanta Brand',
-  'Sri Kaliswari Fireworks',
-  'Coronation Fireworks',
-  'Vadivel Pyrotechnics',
-  'Ayyan Fireworks',
-];
-
-// Seed Products (Crackers Inventory)
-const initialProducts = [
-  {
-    id: 'PROD-101',
-    brand: 'Standard Crackers',
-    name: 'Flower Pot (Deluxe)',
-    category: 'Flower Pots',
-    image: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300&q=80',
-    pricePerPiece: 2,
-    piecesPerCase: 10,
-    availableCases: 100,
-    minStockCases: 15,
-  },
-  {
-    id: 'PROD-102',
-    brand: 'Standard Crackers',
-    name: '10cm Electric Sparklers',
-    category: 'Sparklers',
-    image: 'https://images.unsplash.com/photo-1513151233558-d860c5398176?w=300&q=80',
-    pricePerPiece: 12,
-    piecesPerCase: 100,
-    availableCases: 150,
-    minStockCases: 20,
-  },
-  {
-    id: 'PROD-103',
-    brand: 'Ajanta Brand',
-    name: 'Ground Chakkar (Big)',
-    category: 'Ground Chakkars',
-    image: 'https://images.unsplash.com/photo-1531306728370-e2ebd9d7bb99?w=300&q=80',
-    pricePerPiece: 5,
-    piecesPerCase: 20,
-    availableCases: 80,
-    minStockCases: 10,
-  },
-  {
-    id: 'PROD-104',
-    brand: 'Ajanta Brand',
-    name: 'Whistling Rockets',
-    category: 'Rockets',
-    image: 'https://images.unsplash.com/photo-1498931299472-f7a63a5a1cfa?w=300&q=80',
-    pricePerPiece: 15,
-    piecesPerCase: 10,
-    availableCases: 5, // Low stock
-    minStockCases: 15,
-  },
-  {
-    id: 'PROD-105',
-    brand: 'Sri Kaliswari Fireworks',
-    name: 'Hydro Atom Bomb',
-    category: 'Atom Bombs',
-    image: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=300&q=80',
-    pricePerPiece: 8,
-    piecesPerCase: 50,
-    availableCases: 120,
-    minStockCases: 25,
-  },
-  {
-    id: 'PROD-106',
-    brand: 'Coronation Fireworks',
-    name: '30-Shot Multi Color Aerial',
-    category: 'Multi Shot',
-    image: 'https://images.unsplash.com/photo-1467810563316-b5476525c0f9?w=300&q=80',
-    pricePerPiece: 150,
-    piecesPerCase: 1,
-    availableCases: 3, // Low stock
-    minStockCases: 10,
-  },
-  {
-    id: 'PROD-107',
-    brand: 'Vadivel Pyrotechnics',
-    name: 'Deepavali Family Gift Box',
-    category: 'Gift Boxes',
-    image: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300&q=80',
-    pricePerPiece: 380,
-    piecesPerCase: 1,
-    availableCases: 65,
-    minStockCases: 15,
-  },
-];
-
-// Seed Customers
-const initialCustomers = [
-  {
-    id: 'CUST-101',
-    name: 'Kumar',
-    phone: '9876543210',
-    email: 'kumar@crackersmart.com',
-    status: 'Active',
-    createdAt: '2024-08-15',
-  },
-  {
-    id: 'CUST-102',
-    name: 'Rajesh Traders',
-    phone: '9845612370',
-    email: 'rajesh@saisaitraders.in',
-    status: 'Active',
-    createdAt: '2024-08-20',
-  },
-  {
-    id: 'CUST-103',
-    name: 'Sunita Sharma',
-    phone: '9123456790',
-    email: 'sunita@sharmacrackers.com',
-    status: 'Active',
-    createdAt: '2024-08-25',
-  },
-  {
-    id: 'CUST-104',
-    name: 'Priya Enterprises',
-    phone: '9988776655',
-    email: 'priya@deepavalimart.in',
-    status: 'Active',
-    createdAt: '2024-09-01',
-  },
-];
-
-// Seed Advance Payments
-const initialAdvancePayments = [
-  {
-    id: 'ADV-1001',
-    customerId: 'CUST-101',
-    customerName: 'Kumar',
-    amount: 5000,
-    date: '2024-08-15',
-    paymentReference: 'UPI-982341',
-    paymentMethod: 'UPI',
-  },
-  {
-    id: 'ADV-1002',
-    customerId: 'CUST-102',
-    customerName: 'Rajesh Traders',
-    amount: 50000,
-    date: '2024-08-20',
-    paymentReference: 'NEFT-883920',
-    paymentMethod: 'Bank Transfer',
-  },
-  {
-    id: 'ADV-1003',
-    customerId: 'CUST-103',
-    customerName: 'Sunita Sharma',
-    amount: 100000,
-    date: '2024-08-25',
-    paymentReference: 'CHQ-445123',
-    paymentMethod: 'Cheque',
-  },
-  {
-    id: 'ADV-1004',
-    customerId: 'CUST-104',
-    customerName: 'Priya Enterprises',
-    amount: 150000,
-    date: '2024-09-01',
-    paymentReference: 'NEFT-901234',
-    paymentMethod: 'Bank Transfer',
-  },
-  {
-    id: 'ADV-1005',
-    customerId: 'CUST-101',
-    customerName: 'Kumar',
-    amount: 2000, // Second advance for Kumar
-    date: '2024-09-05',
-    paymentReference: 'CASH-0021',
-    paymentMethod: 'Cash',
-  },
-];
-
-// Seed Purchases
-const initialPurchases = [
-  {
-    id: 'PUR-2024-001',
-    customerId: 'CUST-101',
-    customerName: 'Kumar',
-    purchaseDate: '2024-09-06',
-    status: 'Confirmed',
-    items: [
-      {
-        brand: 'Standard Crackers',
-        productName: 'Flower Pot (Deluxe)',
-        productId: 'PROD-101',
-        casesPurchased: 3,
-        piecesPerCase: 10,
-        pricePerPiece: 2,
-        totalPieces: 30,
-        totalAmount: 60,
-      },
-      {
-        brand: 'Ajanta Brand',
-        productName: '10cm Electric Sparklers',
-        productId: 'PROD-102',
-        casesPurchased: 2,
-        piecesPerCase: 100,
-        pricePerPiece: 12,
-        totalPieces: 200,
-        totalAmount: 2400,
-      },
-    ],
-    totalPurchaseAmount: 2460,
-  },
-  {
-    id: 'PUR-2024-002',
-    customerId: 'CUST-102',
-    customerName: 'Rajesh Traders',
-    purchaseDate: '2024-09-10',
-    status: 'Confirmed',
-    items: [
-      {
-        brand: 'Sri Kaliswari Fireworks',
-        productName: 'Hydro Atom Bomb',
-        productId: 'PROD-105',
-        casesPurchased: 10,
-        piecesPerCase: 50,
-        pricePerPiece: 8,
-        totalPieces: 500,
-        totalAmount: 4000,
-      },
-    ],
-    totalPurchaseAmount: 4000,
-  },
-];
-
-// Seed Stock Transactions Log
-const initialStockTransactions = [
-  {
-    id: 'STX-1001',
-    date: '2024-08-10',
-    productId: 'PROD-101',
-    productName: 'Flower Pot (Deluxe)',
-    brand: 'Standard Crackers',
-    transactionType: 'Initial Stock Addition',
-    casesChanged: 103,
-    piecesChanged: 1030,
-    reason: 'Opening godown inventory intake',
-  },
-  {
-    id: 'STX-1002',
-    date: '2024-09-06',
-    productId: 'PROD-101',
-    productName: 'Flower Pot (Deluxe)',
-    brand: 'Standard Crackers',
-    transactionType: 'Purchase Deduction',
-    casesChanged: -3,
-    piecesChanged: -30,
-    reason: 'Purchase PUR-2024-001 confirmed for Customer Kumar',
-  },
-  {
-    id: 'STX-1003',
-    date: '2024-09-06',
-    productId: 'PROD-102',
-    productName: '10cm Electric Sparklers',
-    brand: 'Standard Crackers',
-    transactionType: 'Purchase Deduction',
-    casesChanged: -2,
-    piecesChanged: -200,
-    reason: 'Purchase PUR-2024-001 confirmed for Customer Kumar',
-  },
-  {
-    id: 'STX-1004',
-    date: '2024-09-10',
-    productId: 'PROD-105',
-    productName: 'Hydro Atom Bomb',
-    brand: 'Sri Kaliswari Fireworks',
-    transactionType: 'Purchase Deduction',
-    casesChanged: -10,
-    piecesChanged: -500,
-    reason: 'Purchase PUR-2024-002 confirmed for Customer Rajesh Traders',
-  },
-];
 
 export const StockProvider = ({ children }) => {
-  const [brands, setBrands] = useState(() => {
-    const saved = localStorage.getItem('crackers_brands');
-    return saved ? JSON.parse(saved) : initialBrands;
-  });
+  const [brands, setBrands] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [advancePayments, setAdvancePayments] = useState([]);
+  const [purchases, setPurchases] = useState([]);
+  const [stockTransactions, setStockTransactions] = useState([]);
 
-  const [products, setProducts] = useState(() => {
-    const saved = localStorage.getItem('crackers_products');
-    return saved ? JSON.parse(saved) : initialProducts;
-  });
+  // Fetch Live Data from Backend MongoDB Database on Mount
+  const fetchAllFromBackend = async () => {
+    try {
+      const [custRes, prodRes, brandRes, purRes, advRes, txnRes] = await Promise.all([
+        customerService.getAll().catch(() => ({ data: [] })),
+        productService.getAll().catch(() => ({ data: [] })),
+        brandService.getAll().catch(() => ({ data: [] })),
+        purchaseService.getAll().catch(() => ({ data: [] })),
+        advanceService.getAll().catch(() => ({ data: [] })),
+        transactionService.getAll().catch(() => ({ data: [] })),
+      ]);
 
-  const [customers, setCustomers] = useState(() => {
-    const saved = localStorage.getItem('crackers_customers');
-    return saved ? JSON.parse(saved) : initialCustomers;
-  });
+      if (custRes.data && custRes.data.length > 0) {
+        setCustomers(custRes.data.map(c => ({
+          ...c,
+          id: c.customId || c.id || c._id,
+        })));
+      }
+      if (prodRes.data && prodRes.data.length > 0) {
+        setProducts(prodRes.data.map(p => ({
+          ...p,
+          id: p.id || p._id,
+        })));
+      }
+      if (brandRes.data && brandRes.data.length > 0) {
+        setBrands(brandRes.data.map(b => typeof b === 'string' ? b : b.name));
+      } else {
+        setBrands([]);
+      }
+      if (purRes.data && purRes.data.length > 0) {
+        setPurchases(purRes.data.map(p => ({
+          ...p,
+          id: p.id || p._id,
+        })));
+      }
+      if (advRes.data && advRes.data.length > 0) {
+        setAdvancePayments(advRes.data.map(a => ({
+          ...a,
+          id: a.id || a._id,
+        })));
+      }
+      if (txnRes.data && txnRes.data.length > 0) {
+        setStockTransactions(txnRes.data.map(t => ({
+          ...t,
+          id: t.id || t._id,
+        })));
+      }
+    } catch (err) {
+      console.error('Error fetching MongoDB live data:', err);
+    }
+  };
 
-  const [advancePayments, setAdvancePayments] = useState(() => {
-    const saved = localStorage.getItem('crackers_advances');
-    return saved ? JSON.parse(saved) : initialAdvancePayments;
-  });
-
-  const [purchases, setPurchases] = useState(() => {
-    const saved = localStorage.getItem('crackers_purchases');
-    return saved ? JSON.parse(saved) : initialPurchases;
-  });
-
-  const [stockTransactions, setStockTransactions] = useState(() => {
-    const saved = localStorage.getItem('crackers_stock_transactions');
-    return saved ? JSON.parse(saved) : initialStockTransactions;
-  });
-
-  // Sync state to localStorage
   useEffect(() => {
-    localStorage.setItem('crackers_brands', JSON.stringify(brands));
-  }, [brands]);
-
-  useEffect(() => {
-    localStorage.setItem('crackers_products', JSON.stringify(products));
-  }, [products]);
-
-  useEffect(() => {
-    localStorage.setItem('crackers_customers', JSON.stringify(customers));
-  }, [customers]);
-
-  useEffect(() => {
-    localStorage.setItem('crackers_advances', JSON.stringify(advancePayments));
-  }, [advancePayments]);
-
-  useEffect(() => {
-    localStorage.setItem('crackers_purchases', JSON.stringify(purchases));
-  }, [purchases]);
-
-  useEffect(() => {
-    localStorage.setItem('crackers_stock_transactions', JSON.stringify(stockTransactions));
-  }, [stockTransactions]);
+    fetchAllFromBackend();
+  }, []);
 
   // Brand Management
   const addBrand = (brandName) => {
@@ -587,6 +326,20 @@ export const StockProvider = ({ children }) => {
     (c) => getCustomerRemainingAdvance(c.id) <= 0
   ).length;
 
+  // Performo / Account Statement Navigation State
+  const [selectedCustomerIdForStatement, setSelectedCustomerIdForStatement] = useState(null);
+  const [targetPerformoTab, setTargetPerformoTab] = useState(null);
+
+  const openCustomerStatement = (customerIdOrName) => {
+    setSelectedCustomerIdForStatement(customerIdOrName);
+    setTargetPerformoTab('account');
+  };
+
+  const clearCustomerStatementNav = () => {
+    setSelectedCustomerIdForStatement(null);
+    setTargetPerformoTab(null);
+  };
+
   return (
     <StockContext.Provider
       value={{
@@ -617,6 +370,11 @@ export const StockProvider = ({ children }) => {
         totalStockPieces,
         lowStockProductsCount,
         pendingCustomersCount,
+        // Performo Statement Navigation
+        selectedCustomerIdForStatement,
+        targetPerformoTab,
+        openCustomerStatement,
+        clearCustomerStatementNav,
       }}
     >
       {children}

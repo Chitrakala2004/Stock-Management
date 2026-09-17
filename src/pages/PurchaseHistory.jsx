@@ -4,11 +4,13 @@ import {
   Search,
   Eye,
   Trash2,
+  FileText,
+  Pencil,
 } from 'lucide-react';
 import Modal from '../components/Modal';
 
-const PurchaseHistory = () => {
-  const { purchases = [], customers = [], deletePurchase } = useStock();
+const PurchaseHistory = ({ setActivePage }) => {
+  const { purchases = [], customers = [], deletePurchase, openCustomerStatement } = useStock();
   const [search, setSearch] = useState('');
   const [selectedCustomerIdFilter, setSelectedCustomerIdFilter] = useState('All');
   const [selectedPurchase, setSelectedPurchase] = useState(null);
@@ -98,6 +100,35 @@ const PurchaseHistory = () => {
                     <td className="py-4 px-4 font-extrabold text-blue-700 whitespace-nowrap">{formatCurrency(netBalance)}</td>
                     <td className="py-4 px-4 text-center whitespace-nowrap">
                       <div className="flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => {
+                            if (openCustomerStatement) {
+                              openCustomerStatement(p.customerId || p.customerName);
+                            }
+                            if (setActivePage) {
+                              setActivePage('Performo');
+                            }
+                          }}
+                          className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold border border-blue-200 rounded-lg transition-all cursor-pointer flex items-center gap-1 text-[11px]"
+                          title="View Customer Account Statement"
+                        >
+                          <FileText size={13} />
+                          <span>Statement</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (openCustomerStatement) {
+                              openCustomerStatement(p.customerId || p.customerName);
+                            }
+                            if (setActivePage) {
+                              setActivePage('Performo');
+                            }
+                          }}
+                          className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                          title="Edit Record"
+                        >
+                          <Pencil size={15} />
+                        </button>
                         <button
                           onClick={() => setSelectedPurchase(p)}
                           className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-all cursor-pointer"
