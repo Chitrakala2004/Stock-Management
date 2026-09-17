@@ -4,40 +4,33 @@ import {
   Plus,
   Edit3,
   Trash2,
-  Eye,
-  Download,
   Building2,
-  User,
-  Phone,
-  Mail,
+  MapPin,
   FileText,
-  Boxes,
 } from 'lucide-react';
 import Modal from '../components/Modal';
 
 const initialCompanies = [
-  { id: 1, name: 'Standard Fireworks Ltd', contact: 'A. Rajaratnam', phone: '9842145670', email: 'orders@standardfireworks.com', products: 28, totalBusiness: '₹12,50,000.00', gst: '33AABCS1234L1Z5', status: 'Active' },
-  { id: 2, name: 'Sri Kaliswari Fireworks', contact: 'K. Shanmugam', phone: '9842367890', email: 'sales@kaliswarifireworks.com', products: 22, totalBusiness: '₹8,85,000.00', gst: '33AABCS5678M2Z3', status: 'Active' },
-  { id: 3, name: 'Coronation Fireworks', contact: 'V. Sundaram', phone: '9123456790', email: 'info@coronationfireworks.com', products: 18, totalBusiness: '₹6,20,000.00', gst: '33AABCM9012N3Z1', status: 'Active' },
-  { id: 4, name: 'Vadivel Pyrotechnics', contact: 'P. Vadivel', phone: '9988776655', email: 'contact@vadivelpyro.in', products: 14, totalBusiness: '₹4,90,000.00', gst: '33AABCP3456O4Z9', status: 'Active' },
-  { id: 5, name: 'Metal Powder Crackers Co.', contact: 'M. Arumugam', phone: '9765432109', email: 'sales@metalpowdercrackers.com', products: 12, totalBusiness: '₹3,50,000.00', gst: '33AABCM7890P5Z2', status: 'Active' },
-  { id: 6, name: 'Ayyan Fireworks', contact: 'S. Ayyanar', phone: '9654321098', email: 'support@ayyanfireworks.com', products: 16, totalBusiness: '₹5,10,000.00', gst: '33AABCA4321Q6Z8', status: 'Active' },
+  { id: 1, name: 'Standard Fireworks Ltd', address: 'Sivakasi, Tamil Nadu - 626123', gst: '33AABCS1234L1Z5' },
+  { id: 2, name: 'Sri Kaliswari Fireworks', address: 'Sivakasi, Tamil Nadu - 626189', gst: '33AABCS5678M2Z3' },
+  { id: 3, name: 'Coronation Fireworks', address: 'Main Road, Sivakasi, Tamil Nadu - 626123', gst: '33AABCM9012N3Z1' },
+  { id: 4, name: 'Vadivel Pyrotechnics', address: 'Industrial Estate, Sivakasi, Tamil Nadu - 626124', gst: '33AABCP3456O4Z9' },
+  { id: 5, name: 'Metal Powder Crackers Co.', address: 'Ring Road, Sivakasi, Tamil Nadu - 626123', gst: '33AABCM7890P5Z2' },
+  { id: 6, name: 'Ayyan Fireworks', address: 'Vembakottai Road, Sivakasi, Tamil Nadu - 626131', gst: '33AABCA4321Q6Z8' },
 ];
 
 const Companies = () => {
   const [companies, setCompanies] = useState(initialCompanies);
   const [search, setSearch] = useState('');
-  const [filterStatus, setFilterStatus] = useState('All');
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingCompany, setEditingCompany] = useState(null);
 
   // Form State
   const [formData, setFormData] = useState({
     name: '',
-    contact: '',
-    phone: '',
-    email: '',
+    address: '',
     gst: '',
-    status: 'Active',
   });
 
   const handleInputChange = (e) => {
@@ -47,157 +40,175 @@ const Companies = () => {
 
   const handleAddCompany = (e) => {
     e.preventDefault();
-    if (!formData.name || !formData.phone) return;
+    if (!formData.name) return;
 
     const newCompany = {
       id: Date.now(),
-      name: formData.name,
-      contact: formData.contact || 'N/A',
-      phone: formData.phone,
-      email: formData.email || 'N/A',
+      name: formData.name.toUpperCase(),
+      address: formData.address || 'N/A',
       gst: formData.gst ? formData.gst.toUpperCase() : 'N/A',
-      products: 0,
-      totalBusiness: '₹0.00',
-      status: formData.status,
     };
 
     setCompanies([newCompany, ...companies]);
-    setFormData({ name: '', contact: '', phone: '', email: '', gst: '', status: 'Active' });
-    setIsModalOpen(false);
+    setFormData({ name: '', address: '', gst: '' });
+    setIsAddModalOpen(false);
+  };
+
+  const openEditModal = (comp) => {
+    setEditingCompany(comp);
+    setFormData({
+      name: comp.name,
+      address: comp.address,
+      gst: comp.gst,
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const handleUpdateCompany = (e) => {
+    e.preventDefault();
+    if (!editingCompany || !formData.name) return;
+
+    setCompanies(
+      companies.map((c) =>
+        c.id === editingCompany.id
+          ? {
+              ...c,
+              name: formData.name.toUpperCase(),
+              address: formData.address,
+              gst: formData.gst.toUpperCase(),
+            }
+          : c
+      )
+    );
+
+    setIsEditModalOpen(false);
+    setEditingCompany(null);
   };
 
   const handleDelete = (id) => {
-    if (window.confirm('Are you sure you want to delete this manufacturer company?')) {
+    if (window.confirm('Are you sure you want to delete this company?')) {
       setCompanies(companies.filter((c) => c.id !== id));
     }
   };
 
   const filtered = companies.filter((c) => {
-    const matchSearch =
-      c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.contact.toLowerCase().includes(search.toLowerCase()) ||
-      c.phone.includes(search);
-    const matchStatus = filterStatus === 'All' || c.status === filterStatus;
-    return matchSearch && matchStatus;
+    const query = search.toLowerCase();
+    return (
+      c.name.toLowerCase().includes(query) ||
+      c.address.toLowerCase().includes(query) ||
+      c.gst.toLowerCase().includes(query)
+    );
   });
 
-  const activeCount = companies.filter((c) => c.status === 'Active').length;
-  const totalProducts = companies.reduce((acc, c) => acc + c.products, 0);
-
-  const stats = [
-    { label: 'FIREWORKS MANUFACTURERS', value: companies.length.toString(), subtitle: 'Registered suppliers', color: 'text-gray-900' },
-    { label: 'ACTIVE BRANDS', value: activeCount.toString(), subtitle: 'Supplying this season', color: 'text-green-600' },
-    { label: 'TOTAL CRACKERS VARIETIES', value: totalProducts.toString(), subtitle: 'Across all manufacturers', color: 'text-blue-600' },
-    { label: 'MANUFACTURER PROCUREMENT', value: '₹41,05,000.00', subtitle: 'Total stock purchase', color: 'text-purple-600' },
-  ];
-
   return (
-    <div>
-      {/* Stats */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
-        {stats.map((s) => (
-          <div key={s.label} className="bg-white rounded-xl p-5 border border-gray-200 hover:shadow-md transition-shadow duration-300">
-            <p className="text-[10px] font-semibold text-gray-400 tracking-widest uppercase mb-3">{s.label}</p>
-            <p className={`text-2xl font-bold ${s.color} leading-tight`}>{s.value}</p>
-            <p className="text-xs text-gray-400 mt-1.5">{s.subtitle}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Table Card */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5">
-        <div className="flex items-center justify-between mb-5">
-          <h3 className="font-semibold text-gray-900 text-[15px]">Fireworks Manufacturer Companies</h3>
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search manufacturer..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-56 pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-              />
-            </div>
-            <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-lg px-1 py-1">
-              {['All', 'Active', 'Inactive'].map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setFilterStatus(s)}
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                    filterStatus === s ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-                  }`}
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
-            <button className="flex items-center gap-1.5 px-3 py-2 text-gray-600 border border-gray-200 rounded-lg text-sm hover:bg-gray-50 transition-colors">
-              <Download size={14} />
-              Export
-            </button>
-            <button
-              onClick={() => setIsModalOpen(true)}
-              className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 active:scale-[0.98] transition-all shadow-sm shadow-blue-200 cursor-pointer"
-            >
-              <Plus size={15} />
-              Add Company
-            </button>
-          </div>
+    <div className="space-y-6">
+      {/* Page Title & Actions */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Company</h1>
+          <p className="text-sm text-slate-500 mt-1">
+            Registered supplier & manufacturer company directory
+          </p>
         </div>
 
-        {/* Table */}
+        <div className="flex items-center gap-3">
+          {/* Search Box */}
+          <div className="relative">
+            <Search
+              size={16}
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+            />
+            <input
+              type="text"
+              placeholder="Search company or GSTIN..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-64 pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all shadow-xs"
+            />
+          </div>
+
+          {/* Add New Company Button */}
+          <button
+            onClick={() => {
+              setFormData({ name: '', address: '', gst: '' });
+              setIsAddModalOpen(true);
+            }}
+            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-sm active:scale-[0.98] transition-all shadow-sm shadow-blue-500/20 cursor-pointer"
+          >
+            <Plus size={16} />
+            Add New Company
+          </button>
+        </div>
+      </div>
+
+      {/* Companies Table Card */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-gray-100">
-                <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider py-3 px-4">#</th>
-                <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider py-3 px-4">Manufacturer Company</th>
-                <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider py-3 px-4">Contact Person</th>
-                <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider py-3 px-4">Phone</th>
-                <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider py-3 px-4">GST No.</th>
-                <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider py-3 px-4">Crackers Items</th>
-                <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider py-3 px-4">Total Procurement</th>
-                <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider py-3 px-4">Status</th>
-                <th className="text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider py-3 px-4">Actions</th>
+              <tr className="border-b border-slate-100 bg-slate-50/70">
+                <th className="py-4 px-6 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  #
+                </th>
+                <th className="py-4 px-6 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  COMPANY NAME
+                </th>
+                <th className="py-4 px-6 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  ADDRESS
+                </th>
+                <th className="py-4 px-6 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  GSTIN
+                </th>
+                <th className="py-4 px-6 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  ACTIONS
+                </th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-slate-100 text-sm">
               {filtered.map((c, idx) => (
-                <tr key={c.id} className="border-b border-gray-50 hover:bg-blue-50/30 transition-colors">
-                  <td className="py-3.5 px-4 text-sm text-gray-400">{idx + 1}</td>
-                  <td className="py-3.5 px-4">
+                <tr key={c.id} className="hover:bg-slate-50/60 transition-colors">
+                  {/* # */}
+                  <td className="py-4 px-6 font-mono text-slate-400 text-xs font-medium">
+                    {idx + 1}
+                  </td>
+
+                  {/* Company Name */}
+                  <td className="py-4 px-6">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-purple-100 text-purple-600 rounded-lg flex items-center justify-center">
-                        <Building2 size={15} />
+                      <div className="w-9 h-9 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center font-bold text-xs shrink-0">
+                        <Building2 size={16} />
                       </div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">{c.name}</p>
-                        <p className="text-[11px] text-gray-400">{c.email}</p>
-                      </div>
+                      <p className="font-bold text-slate-900 text-sm tracking-wide uppercase">
+                        {c.name}
+                      </p>
                     </div>
                   </td>
-                  <td className="py-3.5 px-4 text-sm text-gray-700">{c.contact}</td>
-                  <td className="py-3.5 px-4 text-sm text-gray-600">{c.phone}</td>
-                  <td className="py-3.5 px-4 text-[12px] font-mono text-gray-500">{c.gst}</td>
-                  <td className="py-3.5 px-4">
-                    <span className="text-sm font-semibold text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-md">{c.products} Items</span>
+
+                  {/* Address */}
+                  <td className="py-4 px-6 font-medium text-slate-700 text-xs">
+                    {c.address}
                   </td>
-                  <td className="py-3.5 px-4 text-sm font-semibold text-gray-900">{c.totalBusiness}</td>
-                  <td className="py-3.5 px-4">
-                    <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-md ${
-                      c.status === 'Active' ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-500'
-                    }`}>
-                      {c.status}
-                    </span>
+
+                  {/* GSTIN */}
+                  <td className="py-4 px-6 font-mono text-slate-700 text-xs font-semibold">
+                    {c.gst}
                   </td>
-                  <td className="py-3.5 px-4">
-                    <div className="flex items-center gap-1">
-                      <button className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"><Eye size={15} /></button>
-                      <button className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-md transition-colors"><Edit3 size={15} /></button>
+
+                  {/* Actions */}
+                  <td className="py-4 px-6">
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => openEditModal(c)}
+                        title="Edit Company"
+                        className="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center justify-center transition-colors cursor-pointer"
+                      >
+                        <Edit3 size={15} />
+                      </button>
+
                       <button
                         onClick={() => handleDelete(c.id)}
-                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors cursor-pointer"
+                        title="Delete Company"
+                        className="w-8 h-8 rounded-lg bg-slate-100 text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center transition-colors cursor-pointer"
                       >
                         <Trash2 size={15} />
                       </button>
@@ -205,111 +216,159 @@ const Companies = () => {
                   </td>
                 </tr>
               ))}
+
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan="5" className="text-center py-12 text-slate-400 text-sm">
+                    No companies found matching search criteria.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Add Company Modal */}
-      <Modal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title="Add Fireworks Manufacturer Company"
-      >
-        <form onSubmit={handleAddCompany} className="space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
-              Manufacturer Company Name <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              name="name"
-              required
-              placeholder="e.g. Standard Fireworks Ltd"
-              value={formData.name}
-              onChange={handleInputChange}
-              className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
+      {/* ── Modal 1: Add New Company ── */}
+      {isAddModalOpen && (
+        <Modal
+          isOpen={isAddModalOpen}
+          onClose={() => setIsAddModalOpen(false)}
+          title="Add New Company"
+          width="max-w-xl"
+        >
+          <form onSubmit={handleAddCompany} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
-                Contact Representative
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                Company Name <span className="text-rose-500">*</span>
               </label>
               <input
                 type="text"
-                name="contact"
-                placeholder="e.g. Shanmugam"
-                value={formData.contact}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
-                Phone Number <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="tel"
-                name="phone"
                 required
-                placeholder="e.g. 9842145670"
-                value={formData.phone}
+                placeholder="e.g. STANDARD FIREWORKS LTD"
+                value={formData.name}
                 onChange={handleInputChange}
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                name="name"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm uppercase focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 font-medium"
               />
             </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
-                Email Address
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                Address <span className="text-rose-500">*</span>
               </label>
-              <input
-                type="email"
-                name="email"
-                placeholder="e.g. sales@manufacturer.com"
-                value={formData.email}
+              <textarea
+                required
+                rows={3}
+                placeholder="e.g. Main Factory Road, Sivakasi, Tamil Nadu - 626123"
+                value={formData.address}
                 onChange={handleInputChange}
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                name="address"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 resize-none font-medium"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
-                GST Number
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                GSTIN
               </label>
               <input
                 type="text"
-                name="gst"
                 placeholder="e.g. 33AABCS1234L1Z5"
                 value={formData.gst}
                 onChange={handleInputChange}
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase font-mono"
+                name="gst"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm uppercase font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
               />
             </div>
-          </div>
 
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
-            <button
-              type="button"
-              onClick={() => setIsModalOpen(false)}
-              className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-xl"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-5 py-2 bg-blue-600 text-white font-semibold text-sm rounded-xl hover:bg-blue-700 active:scale-[0.98] transition-all cursor-pointer"
-            >
-              Save Company
-            </button>
-          </div>
-        </form>
-      </Modal>
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsAddModalOpen(false)}
+                className="px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-6 py-2.5 bg-blue-600 text-white font-semibold text-sm rounded-xl hover:bg-blue-700 transition-all shadow-sm cursor-pointer"
+              >
+                Save Company
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* ── Modal 2: Edit Company ── */}
+      {isEditModalOpen && editingCompany && (
+        <Modal
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          title={`Edit Company - ${editingCompany.name}`}
+          width="max-w-xl"
+        >
+          <form onSubmit={handleUpdateCompany} className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                Company Name <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={formData.name}
+                onChange={handleInputChange}
+                name="name"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm uppercase focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 font-medium"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                Address <span className="text-rose-500">*</span>
+              </label>
+              <textarea
+                required
+                rows={3}
+                value={formData.address}
+                onChange={handleInputChange}
+                name="address"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 resize-none font-medium"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                GSTIN
+              </label>
+              <input
+                type="text"
+                value={formData.gst}
+                onChange={handleInputChange}
+                name="gst"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm uppercase font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsEditModalOpen(false)}
+                className="px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-6 py-2.5 bg-blue-600 text-white font-semibold text-sm rounded-xl hover:bg-blue-700 transition-all shadow-sm cursor-pointer"
+              >
+                Update Company
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
     </div>
   );
 };

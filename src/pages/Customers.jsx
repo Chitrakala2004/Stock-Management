@@ -344,16 +344,7 @@ const Customers = () => {
             />
           </div>
 
-          {/* Print List Button */}
-          <button
-            onClick={handlePrintList}
-            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 font-semibold rounded-xl text-sm hover:bg-slate-50 active:scale-[0.98] transition-all shadow-xs cursor-pointer"
-          >
-            <Printer size={16} className="text-slate-500" />
-            Print List ({filteredCustomers.length})
-          </button>
-
-          {/* Add New Customer Button */}
+       {/* Add New Customer Button */}
           <button
             onClick={() => setIsAddModalOpen(true)}
             className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl text-sm active:scale-[0.98] transition-all shadow-sm shadow-blue-500/20 cursor-pointer"
@@ -540,11 +531,13 @@ const Customers = () => {
           isOpen={isAddModalOpen}
           onClose={() => setIsAddModalOpen(false)}
           title="Add New Customer"
+          width="max-w-2xl"
         >
           <form onSubmit={handleAddCustomer} className="space-y-4">
+            {/* Full Name */}
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                Customer Name / Firm Name <span className="text-rose-500">*</span>
+                Full Name <span className="text-rose-500">*</span>
               </label>
               <input
                 type="text"
@@ -553,45 +546,15 @@ const Customers = () => {
                 value={formData.name}
                 onChange={handleInputChange}
                 name="name"
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm uppercase focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm uppercase focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 font-medium"
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            {/* Mobile Number & GSTIN / Tax ID */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  GSTIN Number
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. 22ADWPN7742F1Z7"
-                  value={formData.gst}
-                  onChange={handleInputChange}
-                  name="gst"
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm uppercase font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  State / Location <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. CHHATTISGARH"
-                  value={formData.address}
-                  onChange={handleInputChange}
-                  name="address"
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm uppercase focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Phone Number <span className="text-rose-500">*</span>
+                  Mobile Number <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="tel"
@@ -600,68 +563,68 @@ const Customers = () => {
                   value={formData.phone}
                   onChange={handleInputChange}
                   name="phone"
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 font-medium"
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Email Address
+                  GSTIN / Tax ID
                 </label>
                 <input
-                  type="email"
-                  placeholder="e.g. customer@shop.com"
-                  value={formData.email}
+                  type="text"
+                  placeholder="e.g. 22ADWPN7742F1Z7"
+                  value={formData.gst}
                   onChange={handleInputChange}
-                  name="email"
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                  name="gst"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm uppercase font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Opening Debit / Purchases (₹)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  placeholder="e.g. 307506.00"
-                  value={formData.debit}
-                  onChange={handleInputChange}
-                  name="debit"
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-emerald-700 uppercase tracking-wider mb-1.5">
-                  Opening Credit / Payment (₹)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  placeholder="e.g. 307500.00"
-                  value={formData.credit}
-                  onChange={handleInputChange}
-                  name="credit"
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-emerald-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
-                />
-              </div>
+            {/* Email Address */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                Email Address
+              </label>
+              <input
+                type="email"
+                placeholder="e.g. customer@shop.com"
+                value={formData.email}
+                onChange={handleInputChange}
+                name="email"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+              />
             </div>
+
+            {/* Delivery Address */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                Delivery Address <span className="text-rose-500">*</span>
+              </label>
+              <textarea
+                required
+                rows={3}
+                placeholder="e.g. Plot No. 45, Main Commercial Complex, Raipur, Chhattisgarh - 492001"
+                value={formData.address}
+                onChange={handleInputChange}
+                name="address"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 resize-none font-medium"
+              />
+            </div>
+
 
             <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
               <button
                 type="button"
                 onClick={() => setIsAddModalOpen(false)}
-                className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl"
+                className="px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-5 py-2.5 bg-blue-600 text-white font-semibold text-sm rounded-xl hover:bg-blue-700 transition-all shadow-sm cursor-pointer"
+                className="px-6 py-2.5 bg-blue-600 text-white font-semibold text-sm rounded-xl hover:bg-blue-700 transition-all shadow-sm cursor-pointer"
               >
                 Save Customer
               </button>
@@ -676,11 +639,13 @@ const Customers = () => {
           isOpen={isEditModalOpen}
           onClose={() => setIsEditModalOpen(false)}
           title={`Edit Customer - ${editCustomer.name}`}
+          width="max-w-2xl"
         >
           <form onSubmit={handleUpdateCustomer} className="space-y-4">
+            {/* Full Name */}
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                Customer Name / Firm Name
+                Full Name <span className="text-rose-500">*</span>
               </label>
               <input
                 type="text"
@@ -688,43 +653,15 @@ const Customers = () => {
                 value={formData.name}
                 onChange={handleInputChange}
                 name="name"
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm uppercase focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm uppercase focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 font-medium"
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            {/* Mobile Number & GSTIN / Tax ID */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  GSTIN Number
-                </label>
-                <input
-                  type="text"
-                  value={formData.gst}
-                  onChange={handleInputChange}
-                  name="gst"
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm uppercase font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  State / Location
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.address}
-                  onChange={handleInputChange}
-                  name="address"
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm uppercase focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Phone Number
+                  Mobile Number <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="tel"
@@ -732,35 +669,64 @@ const Customers = () => {
                   value={formData.phone}
                   onChange={handleInputChange}
                   name="phone"
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 font-medium"
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Email Address
+                  GSTIN / Tax ID
                 </label>
                 <input
-                  type="email"
-                  value={formData.email}
+                  type="text"
+                  value={formData.gst}
                   onChange={handleInputChange}
-                  name="email"
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                  name="gst"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm uppercase font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
                 />
               </div>
+            </div>
+
+            {/* Delivery Address */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                Delivery Address <span className="text-rose-500">*</span>
+              </label>
+              <textarea
+                required
+                rows={3}
+                value={formData.address}
+                onChange={handleInputChange}
+                name="address"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 resize-none font-medium"
+              />
+            </div>
+
+            {/* Email Address */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                Email Address
+              </label>
+              <input
+                type="email"
+                value={formData.email}
+                onChange={handleInputChange}
+                name="email"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+              />
             </div>
 
             <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
               <button
                 type="button"
                 onClick={() => setIsEditModalOpen(false)}
-                className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl"
+                className="px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-5 py-2.5 bg-blue-600 text-white font-semibold text-sm rounded-xl hover:bg-blue-700 transition-all shadow-sm cursor-pointer"
+                className="px-6 py-2.5 bg-blue-600 text-white font-semibold text-sm rounded-xl hover:bg-blue-700 transition-all shadow-sm cursor-pointer"
               >
                 Update Customer
               </button>
