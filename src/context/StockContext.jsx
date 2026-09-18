@@ -267,10 +267,26 @@ export const StockProvider = ({ children }) => {
     }
   };
 
+  // Customer ID Sequence Helper (CUST-101, CUST-102, CUST-103...)
+  const getNextCustomerId = (custList = customers) => {
+    let maxNum = 100;
+    (custList || []).forEach((c) => {
+      const raw = String(c?.customId || c?.id || c?._id || '');
+      const match = raw.match(/CUST-(\d+)/i);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (!isNaN(num) && num > maxNum) maxNum = num;
+      }
+    });
+    return `CUST-${maxNum + 1}`;
+  };
+
   // Customer Management
   const addCustomer = async (customerData) => {
+    const nextCustomId = customerData.customId || getNextCustomerId(customers);
     try {
       const payload = {
+        customId: nextCustomId,
         name: customerData.name,
         phone: customerData.phone || '',
         gst: customerData.gst || 'N/A',
@@ -284,18 +300,27 @@ export const StockProvider = ({ children }) => {
       const saved = res.data;
       const formatted = {
         ...saved,
-        id: saved.customId || saved.id || saved._id,
+        id: saved.customId || saved.id || saved._id || nextCustomId,
+        customId: saved.customId || nextCustomId,
       };
-      setCustomers((prev) => [formatted, ...prev]);
+      setCustomers((prev) => [
+        formatted,
+        ...prev.filter((c) => (c.customId || c.id || c._id) !== formatted.id),
+      ]);
       return formatted;
     } catch (err) {
       console.error('Error creating customer in backend:', err);
       const fallbackCust = {
-        id: `CUST-${Date.now()}`,
+        id: nextCustomId,
+        customId: nextCustomId,
+        _id: nextCustomId,
         ...customerData,
         createdAt: new Date().toISOString().split('T')[0],
       };
-      setCustomers((prev) => [fallbackCust, ...prev]);
+      setCustomers((prev) => [
+        fallbackCust,
+        ...prev.filter((c) => (c.customId || c.id || c._id) !== fallbackCust.id),
+      ]);
       return fallbackCust;
     }
   };
@@ -534,6 +559,7 @@ export const StockProvider = ({ children }) => {
         adjustProductStock,
         deleteProduct,
         customers,
+        getNextCustomerId,
         addCustomer,
         updateCustomer,
         deleteCustomer,

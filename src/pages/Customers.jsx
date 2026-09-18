@@ -26,6 +26,7 @@ const Customers = () => {
     customers: contextCustomers = [],
     purchases: contextPurchases = [],
     advancePayments: contextAdvances = [],
+    getNextCustomerId,
     addCustomer,
     updateCustomer,
     deleteCustomer,
@@ -98,6 +99,10 @@ const Customers = () => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const assignedCustomerId = getNextCustomerId
+    ? getNextCustomerId(customers)
+    : `CUST-${101 + customers.length}`;
+
   // Add Customer Submit (Saves to MongoDB Atlas)
   const handleAddCustomer = async (e) => {
     e.preventDefault();
@@ -106,7 +111,10 @@ const Customers = () => {
     const debitVal = parseFloat(formData.debit) || 0;
     const creditVal = parseFloat(formData.credit) || 0;
 
+    const assignedId = assignedCustomerId;
+
     const newCustPayload = {
+      customId: assignedId,
       name: formData.name.toUpperCase(),
       gst: formData.gst ? formData.gst.toUpperCase() : 'N/A',
       address: formData.address ? formData.address.toUpperCase() : 'N/A',
@@ -120,7 +128,7 @@ const Customers = () => {
     if (addCustomer) {
       savedCust = await addCustomer(newCustPayload);
     } else {
-      savedCust = { id: `CUST-${Date.now()}`, ...newCustPayload };
+      savedCust = { id: assignedId, customId: assignedId, ...newCustPayload };
       setCustomers((prev) => [savedCust, ...prev]);
     }
 
@@ -387,8 +395,8 @@ const Customers = () => {
                     onClick={() => openLedgerModal(cust)}
                   >
                     {/* ID */}
-                    <td className="py-4 px-6 font-mono text-slate-400 text-xs font-medium">
-                      {cust.id}
+                    <td className="py-4 px-6 font-mono text-blue-700 text-xs font-bold">
+                      {cust.customId || cust.id}
                     </td>
 
                     {/* Customer Name */}
@@ -524,6 +532,18 @@ const Customers = () => {
           width="max-w-2xl"
         >
           <form onSubmit={handleAddCustomer} className="space-y-4">
+            {/* Sequential Customer ID Badge */}
+            <div className="flex items-center justify-between px-4 py-2.5 bg-blue-50/80 border border-blue-200/80 rounded-xl">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                  Assigned Customer ID:
+                </span>
+                <span className="font-mono font-extrabold text-blue-700 bg-white px-2.5 py-0.5 rounded-md border border-blue-200 shadow-2xs text-xs">
+                  {assignedCustomerId}
+                </span>
+              </div>
+              <span className="text-[11px] font-semibold text-blue-600">Auto Sequential ID</span>
+            </div>
             {/* Full Name */}
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">

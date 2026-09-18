@@ -5,6 +5,7 @@ let memoryCustomers = [
   {
     _id: 'CUST-101',
     id: 'CUST-101',
+    customId: 'CUST-101',
     name: 'SAI MOHAN MARKETING',
     phone: '86020 05900',
     gst: '22ADWPN7742F1Z7',
@@ -16,6 +17,7 @@ let memoryCustomers = [
   {
     _id: 'CUST-102',
     id: 'CUST-102',
+    customId: 'CUST-102',
     name: 'SRI SAI TRADERS',
     phone: '98765 43210',
     gst: '33AAACR1234F1Z1',
@@ -27,6 +29,7 @@ let memoryCustomers = [
   {
     _id: 'CUST-103',
     id: 'CUST-103',
+    customId: 'CUST-103',
     name: 'SHARMA CRACKERS STORE',
     phone: '98456 12370',
     gst: '27AABCS5678G2Z3',
@@ -38,6 +41,7 @@ let memoryCustomers = [
   {
     _id: 'CUST-104',
     id: 'CUST-104',
+    customId: 'CUST-104',
     name: 'MEENA STORES & FIREWORKS',
     phone: '91234 56790',
     gst: '36AAAFM9012H1Z5',
@@ -48,11 +52,47 @@ let memoryCustomers = [
   },
 ];
 
+// Helper to compute next sequential customer ID (e.g. CUST-101, CUST-102, CUST-105...)
+const computeNextCustomerId = async () => {
+  let maxNum = 100;
+  try {
+    const dbCustomers = await Customer.find({}, 'customId').lean();
+    if (dbCustomers && dbCustomers.length > 0) {
+      dbCustomers.forEach((c) => {
+        const match = String(c.customId || '').match(/CUST-(\d+)/i);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (!isNaN(num) && num > maxNum) maxNum = num;
+        }
+      });
+    }
+  } catch (err) {
+    // Database query error handled silently, proceed to check memory store
+  }
+
+  memoryCustomers.forEach((c) => {
+    const raw = String(c.customId || c.id || c._id || '');
+    const match = raw.match(/CUST-(\d+)/i);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (!isNaN(num) && num > maxNum) maxNum = num;
+    }
+  });
+
+  return `CUST-${maxNum + 1}`;
+};
+
 const getCustomers = async (req, res) => {
   try {
     const customers = await Customer.find().sort({ createdAt: -1 });
     if (customers && customers.length > 0) {
-      return res.status(200).json(customers);
+      return res.status(200).json(
+        customers.map((c) => ({
+          ...c.toObject(),
+          id: c.customId || c._id,
+          customId: c.customId || c._id,
+        }))
+      );
     }
     return res.status(200).json(memoryCustomers);
   } catch (error) {
@@ -61,21 +101,28 @@ const getCustomers = async (req, res) => {
 };
 
 const createCustomer = async (req, res) => {
+  let customId = req.body.customId;
+  if (!customId || !customId.startsWith('CUST-')) {
+    customId = await computeNextCustomerId();
+  }
+
   try {
-    let customId = req.body.customId;
-    if (!customId) {
-      const count = await Customer.countDocuments();
-      customId = `CUST-${101 + count}`;
-    }
     const newCust = await Customer.create({ ...req.body, customId });
-    return res.status(201).json(newCust);
+    const formatted = {
+      ...newCust.toObject(),
+      id: newCust.customId || newCust._id,
+      customId: newCust.customId || customId,
+    };
+    memoryCustomers.unshift(formatted);
+    return res.status(201).json(formatted);
   } catch (error) {
     console.error('Error in createCustomer:', error);
     const newCust = {
-      _id: `CUST-${Date.now()}`,
-      id: `CUST-${Date.now()}`,
+      _id: customId,
+      id: customId,
+      customId: customId,
       ...req.body,
-      status: 'Active',
+      status: req.body.status || 'Active',
     };
     memoryCustomers.unshift(newCust);
     return res.status(201).json(newCust);

@@ -19,6 +19,7 @@ import Modal from '../components/Modal';
 const CustomerAccounts = () => {
   const {
     customers,
+    getNextCustomerId,
     addCustomer,
     deleteCustomer,
     advancePayments,
@@ -48,7 +49,8 @@ const CustomerAccounts = () => {
   const handleAddCustomerSubmit = (e) => {
     e.preventDefault();
     if (!customerForm.name || !customerForm.phone) return;
-    addCustomer(customerForm);
+    const assignedId = getNextCustomerId ? getNextCustomerId(customers) : `CUST-${101 + customers.length}`;
+    addCustomer({ ...customerForm, customId: assignedId });
     setCustomerForm({ name: '', phone: '', email: '' });
     setIsAddCustomerOpen(false);
   };
@@ -217,6 +219,18 @@ const CustomerAccounts = () => {
           title="Create New Customer Account"
         >
           <form onSubmit={handleAddCustomerSubmit} className="space-y-4">
+            {/* Sequential Customer ID Badge */}
+            <div className="flex items-center justify-between px-4 py-2 bg-blue-50/80 border border-blue-200/80 rounded-xl">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                  Assigned ID:
+                </span>
+                <span className="font-mono font-extrabold text-blue-700 bg-white px-2.5 py-0.5 rounded-md border border-blue-200 shadow-2xs text-xs">
+                  {getNextCustomerId ? getNextCustomerId(customers) : `CUST-${101 + customers.length}`}
+                </span>
+              </div>
+              <span className="text-[11px] font-semibold text-blue-600">Auto Sequential ID</span>
+            </div>
             <div>
               <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
                 Customer Name <span className="text-red-500">*</span>

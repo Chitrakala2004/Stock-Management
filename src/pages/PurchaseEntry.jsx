@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useStock } from '../context/StockContext';
 import {
   User,
@@ -19,6 +19,10 @@ import {
   Check,
   X,
   FileText,
+  Download,
+  Printer,
+  RotateCcw,
+  Boxes,
 } from 'lucide-react';
 import Modal from '../components/Modal';
 
@@ -62,6 +66,7 @@ const PurchaseEntry = () => {
     products: contextProducts = [],
     getCustomerRemainingAdvance = () => 0,
     getCustomerTotalAdvance = () => 0,
+    getNextCustomerId,
     addCustomer,
     addAdvancePayment,
     selectedCustomerIdForStatement,
@@ -144,6 +149,23 @@ const PurchaseEntry = () => {
     customersList[0]?.id || 'CUST-101'
   );
 
+  // Helper to extract customer numeric prefix (e.g. '101' from 'CUST-101')
+  const getCustomerNumber = (custIdOrObj) => {
+    if (!custIdOrObj) return '101';
+    const idStr =
+      typeof custIdOrObj === 'object'
+        ? String(custIdOrObj.customId || custIdOrObj.id || custIdOrObj._id || '')
+        : String(custIdOrObj);
+    const match = idStr.match(/\d+/);
+    return match ? match[0] : '101';
+  };
+
+  // Active Customer & Current Customer Number Prefix
+  const activeCustomer =
+    customersList.find((c) => c.id === selectedCustomerId) ||
+    customersList[0];
+  const currentCustNum = getCustomerNumber(activeCustomer?.customId || activeCustomer?.id || selectedCustomerId);
+
   // Listen for Statement navigation requests from All Performo or other pages
   useEffect(() => {
     if (selectedCustomerIdForStatement) {
@@ -209,8 +231,13 @@ const PurchaseEntry = () => {
       return;
     }
 
+    const assignedId = getNextCustomerId
+      ? getNextCustomerId(customersList)
+      : `CUST-${101 + customersList.length}`;
+
     const initAdv = parseFloat(newCustomerForm.advanceAmount) || 0;
     const payload = {
+      customId: assignedId,
       name: newCustomerForm.name.trim().toUpperCase(),
       phone: newCustomerForm.phone.trim(),
       gst: newCustomerForm.gst ? newCustomerForm.gst.trim().toUpperCase() : 'N/A',
@@ -224,7 +251,7 @@ const PurchaseEntry = () => {
       created = await addCustomer(payload);
     }
 
-    const createdId = created?.customId || created?.id || created?._id || `CUST-${Date.now()}`;
+    const createdId = created?.customId || created?.id || created?._id || assignedId;
 
     if (initAdv > 0 && addAdvancePayment && created) {
       await addAdvancePayment({
@@ -282,6 +309,314 @@ const PurchaseEntry = () => {
   const [performoRefNo, setPerformoRefNo] = useState(
     `PRF-2024-${Math.floor(100 + Math.random() * 900)}`
   );
+
+  // ── Product Required Section State (Customer Product Requirement Table) ──
+  // Added products list (initially empty; items are appended below as user presses Enter)
+  const [addedRequiredProducts, setAddedRequiredProducts] = useState([]);
+
+  // Active single entry row input state (Only Product Name and Cases; Amount removed)
+  const [reqEntryProduct, setReqEntryProduct] = useState('');
+  const [reqEntryCases, setReqEntryCases] = useState('');
+  const [editingRequiredId, setEditingRequiredId] = useState(null);
+
+  // Input refs for cursor Enter navigation
+  const reqProdInputRef = useRef(null);
+  const reqCasesInputRef = useRef(null);
+
+  const allProductSuggestions = Array.from(
+    new Set([
+      ...particularOptions,
+      ...(contextProducts || []).map((p) => p.name).filter(Boolean),
+    ])
+  );
+
+  // Add new item below or update existing item
+  const handleAddOrUpdateRequired = () => {
+    const prodName = reqEntryProduct.trim();
+    const casesVal = reqEntryCases.trim();
+
+    if (!prodName && !casesVal) {
+      reqProdInputRef.current?.focus();
+      return;
+    }
+
+    if (editingRequiredId) {
+      // Update existing item in place
+      setAddedRequiredProducts((prev) =>
+        prev.map((item) =>
+          item.id === editingRequiredId
+            ? {
+                ...item,
+                productName: prodName || 'Unspecified Item',
+                cases: casesVal || '0',
+              }
+            : item
+        )
+      );
+      setEditingRequiredId(null);
+      setFeedback({
+        type: 'success',
+        message: `Updated product requirement "${prodName || 'Item'}".`,
+      });
+    } else {
+      // Add new item to list below with sequential Product ID (e.g. 101-01, 101-02)
+      const nextIndex = addedRequiredProducts.length + 1;
+      const newItem = {
+        id: Date.now(),
+        productId: `${currentCustNum}-${String(nextIndex).padStart(2, '0')}`,
+        productName: prodName || 'Unspecified Item',
+        cases: casesVal || '0',
+      };
+      setAddedRequiredProducts((prev) => [...prev, newItem]);
+    }
+
+    // Clear entry inputs and refocus product input for continuous fast entry
+    setReqEntryProduct('');
+    setReqEntryCases('');
+    setTimeout(() => {
+      reqProdInputRef.current?.focus();
+    }, 40);
+  };
+
+  // Keyboard Enter navigation: Product Name -> Cases -> Add to table below!
+  const handleReqKeyDown = (e, field) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (field === 'product') {
+        reqCasesInputRef.current?.focus();
+        reqCasesInputRef.current?.select?.();
+      } else if (field === 'cases') {
+        // Pressing Enter in Cases box directly adds item to the list below!
+        handleAddOrUpdateRequired();
+      }
+    }
+  };
+
+  // Edit item from list
+  const handleEditRequiredItem = (item) => {
+    setEditingRequiredId(item.id);
+    setReqEntryProduct(item.productName || '');
+    setReqEntryCases(item.cases !== undefined ? item.cases.toString() : '');
+    setTimeout(() => {
+      reqProdInputRef.current?.focus();
+      reqProdInputRef.current?.select?.();
+    }, 40);
+  };
+
+  // Cancel editing
+  const handleCancelEditRequired = () => {
+    setEditingRequiredId(null);
+    setReqEntryProduct('');
+    setReqEntryCases('');
+    reqProdInputRef.current?.focus();
+  };
+
+  // Delete item from list
+  const handleDeleteRequiredItem = (id) => {
+    setAddedRequiredProducts((prev) => prev.filter((item) => item.id !== id));
+    if (editingRequiredId === id) {
+      handleCancelEditRequired();
+    }
+  };
+
+  // Reset/Clear all items
+  const handleClearAllRequired = () => {
+    if (addedRequiredProducts.length === 0 && !reqEntryProduct && !reqEntryCases) return;
+    setAddedRequiredProducts([]);
+    handleCancelEditRequired();
+  };
+
+  // Dynamic Case Total of added items (Amount total removed)
+  const totalRequiredCases = addedRequiredProducts.reduce((sum, item) => {
+    const val = parseFloat(item.cases);
+    return sum + (!isNaN(val) && val > 0 ? val : 0);
+  }, 0);
+
+  // Proceed to Product Entry & Billing Setup Handler
+  // Only works after selecting customer account and entering product requirements!
+  const handleProceedToBilling = () => {
+    if (!selectedCustomerId) {
+      setFeedback({
+        type: 'error',
+        message: 'Please select a Customer Account first.',
+      });
+      return;
+    }
+    if (addedRequiredProducts.length === 0) {
+      setFeedback({
+        type: 'error',
+        message: 'Please enter and add at least one product requirement in Product Required before proceeding to billing setup.',
+      });
+      return;
+    }
+
+    // Auto-sync total cases to Step 2
+    if (totalRequiredCases > 0) {
+      setStep2CaseCount(totalRequiredCases.toString());
+    }
+
+    // Auto-populate Step 2 billing product rows with sequential Product IDs if empty
+    if (productRows.length === 0 && addedRequiredProducts.length > 0) {
+      const generatedBillingRows = addedRequiredProducts.map((item, idx) => {
+        const prodMatch = (contextProducts || []).find(
+          (p) => p.name?.toLowerCase() === item.productName?.toLowerCase()
+        );
+        const caseNum = parseFloat(item.cases) || 1;
+        const rateNum = prodMatch?.customerRate || prodMatch?.rate || 0;
+        const pktUnitsNum = prodMatch?.caseQuantity || 0;
+        const totalUnitsNum = caseNum * (pktUnitsNum > 0 ? pktUnitsNum : 1);
+        const amountNum = (pktUnitsNum > 0 ? totalUnitsNum : caseNum) * rateNum;
+
+        return {
+          productId: `${currentCustNum}-${String(idx + 1).padStart(2, '0')}`,
+          particular: item.productName,
+          caseCount: caseNum,
+          rate: rateNum,
+          pktUnits: pktUnitsNum,
+          totalUnits: totalUnitsNum,
+          amount: amountNum,
+          rateMode: 'case',
+        };
+      });
+      setProductRows(generatedBillingRows);
+    }
+
+    setActiveTab('product');
+    setFeedback({
+      type: 'success',
+      message: `Customer "${activeCustomer?.name || 'Customer'}" and ${addedRequiredProducts.length} product requirements ready for billing.`,
+    });
+  };
+
+  // Download Printable Requirement Sheet (PDF) without Amount column
+  const handleDownloadRequiredProducts = () => {
+    if (addedRequiredProducts.length === 0) {
+      alert('Please enter and add at least one product requirement before downloading.');
+      return;
+    }
+
+    const printWindow = window.open('', '_blank', 'width=850,height=900');
+    if (!printWindow) {
+      alert('Please allow popups to download/print the requirement sheet.');
+      return;
+    }
+
+    const customerName = activeCustomer?.name || step2Customer || 'Valued Customer';
+    const customerPhone = activeCustomer?.phone || 'N/A';
+    const customerAddress = activeCustomer?.address || 'N/A';
+    const customerGst = activeCustomer?.gst || 'N/A';
+    const formattedDate = purchaseDate || new Date().toISOString().split('T')[0];
+
+    const htmlContent = `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Customer_Requirement_${customerName.replace(/[^a-zA-Z0-9]/g, '_')}_${formattedDate}</title>
+    <style>
+      @page { size: A4; margin: 12mm; }
+      * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+      body { color: #0f172a; padding: 20px; background: #fff; margin: 0; }
+      .header-box { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #2563eb; padding-bottom: 14px; margin-bottom: 18px; }
+      .brand-title { font-size: 22px; font-weight: 800; color: #1e3a8a; margin: 0 0 4px 0; }
+      .brand-subtitle { font-size: 11px; color: #64748b; margin: 0; font-weight: 500; }
+      .doc-badge { background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; text-align: right; }
+      .info-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 14px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; font-size: 12px; }
+      .info-block p { margin: 3px 0; }
+      .info-label { font-weight: 600; color: #475569; display: inline-block; width: 110px; }
+      .info-val { font-weight: 700; color: #0f172a; }
+      table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 12px; }
+      th { background-color: #f1f5f9; color: #334155; font-weight: 700; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; padding: 10px 14px; border: 1px solid #cbd5e1; text-align: left; }
+      td { padding: 10px 14px; border: 1px solid #e2e8f0; color: #1e293b; }
+      tr:nth-child(even) { background-color: #f8fafc; }
+      .text-center { text-align: center; }
+      .text-right { text-align: right; }
+      .total-row td { background-color: #f1f5f9; font-weight: 800; border-top: 2px solid #334155; font-size: 13px; }
+      .footer-section { margin-top: 35px; display: flex; justify-content: space-between; align-items: flex-end; padding-top: 20px; border-top: 1px dashed #cbd5e1; }
+      .sign-box { text-align: center; width: 160px; }
+      .sign-line { border-top: 1px solid #64748b; margin-top: 35px; padding-top: 5px; font-size: 11px; font-weight: 600; color: #475569; }
+      .no-print-bar { background: #0f172a; color: white; padding: 10px 16px; border-radius: 8px; margin-bottom: 18px; display: flex; justify-content: space-between; align-items: center; }
+      .btn-print { background: #2563eb; color: white; border: none; padding: 7px 16px; font-weight: 700; font-size: 12px; border-radius: 6px; cursor: pointer; }
+      .btn-print:hover { background: #1d4ed8; }
+      @media print { .no-print-bar { display: none !important; } body { padding: 0; } }
+    </style>
+  </head>
+  <body>
+    <div class="no-print-bar">
+      <span style="font-size:13px; font-weight:600;">Customer Product Requirement Sheet ready for Download / Print</span>
+      <button class="btn-print" onclick="window.print()">Print / Save as PDF</button>
+    </div>
+    <div class="header-box">
+      <div>
+        <h1 class="brand-title">DHEEKSHA TRADERS</h1>
+        <p class="brand-subtitle">Wholesale Fireworks & Stock Management System</p>
+      </div>
+      <div class="doc-badge">
+        <div>PRODUCT REQUIRED</div>
+        <div style="font-size: 10px; font-weight: normal; color: #475569; margin-top: 2px;">Date: <strong>${formattedDate}</strong></div>
+      </div>
+    </div>
+    <div class="info-grid">
+      <div class="info-block">
+        <p><span class="info-label">Customer Name:</span> <span class="info-val">${customerName}</span></p>
+        <p><span class="info-label">Contact Phone:</span> <span class="info-val">${customerPhone}</span></p>
+        <p><span class="info-label">Address:</span> <span class="info-val">${customerAddress}</span></p>
+      </div>
+      <div class="info-block">
+        <p><span class="info-label">Date:</span> <span class="info-val">${formattedDate}</span></p>
+        <p><span class="info-label">GSTIN:</span> <span class="info-val">${customerGst}</span></p>
+        <p><span class="info-label">Sheet Type:</span> <span class="info-val">Customer Requirement</span></p>
+      </div>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th class="text-center" style="width: 100px;">Product ID</th>
+          <th>Product Required</th>
+          <th class="text-center" style="width: 160px;">Requested Cases</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${addedRequiredProducts
+          .map(
+            (item, idx) => `
+          <tr>
+            <td class="text-center" style="font-weight: 700; color: #1d4ed8; font-family: monospace;">${item.productId || `${currentCustNum}-${String(idx + 1).padStart(2, '0')}`}</td>
+            <td style="font-weight: 600;">${item.productName || 'Unspecified Item'}</td>
+            <td class="text-center" style="font-weight: 700; color: #1d4ed8;">${item.cases || '0'} Cases</td>
+          </tr>
+        `
+          )
+          .join('')}
+        <tr class="total-row">
+          <td colspan="2" style="text-align: right; text-transform: uppercase;">Total Cases Required:</td>
+          <td class="text-center" style="color: #1d4ed8;">${totalRequiredCases} Cases</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="footer-section">
+      <div class="sign-box">
+        <div class="sign-line">Customer Signature</div>
+      </div>
+      <div style="text-align:center; font-size:10px; color:#64748b;">
+        <p style="margin:0;">Thank you for your order requirement!</p>
+        <p style="margin:3px 0 0 0;">Generated by Dheeksha Stock Management</p>
+      </div>
+      <div class="sign-box">
+        <div class="sign-line">Authorized Signatory</div>
+      </div>
+    </div>
+    <script>
+      window.onload = function() {
+        setTimeout(function() { window.print(); }, 400);
+      };
+    </script>
+  </body>
+</html>`;
+
+    printWindow.document.open();
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
 
   // Add Credit Form State
   const [creditForm, setCreditForm] = useState({
@@ -363,11 +698,7 @@ const PurchaseEntry = () => {
   // Formula: Product amount = Total Units × Rate (e.g. 50 × ₹20 = ₹1,000.00)
   const calculatedEntryAmount = (pktUnitsVal > 0 ? totalUnitsCalculated : casesVal) * rateVal;
 
-  // Active Customer
-  const activeCustomer =
-    customersList.find((c) => c.id === selectedCustomerId) ||
-    customersList[0];
-
+  // Customer Remaining Advance
   const remainingAdvance = selectedCustomerId
     ? getCustomerRemainingAdvance(selectedCustomerId)
     : 0;
@@ -409,7 +740,11 @@ const PurchaseEntry = () => {
       return;
     }
 
+    const rowIdx = editingRowIndex !== null ? editingRowIndex : productRows.length;
+    const rowProductId = `${currentCustNum}-${String(rowIdx + 1).padStart(2, '0')}`;
+
     const rowData = {
+      productId: rowProductId,
       particular: entryParticular,
       caseCount: casesVal,
       rate: rateVal,
@@ -755,139 +1090,376 @@ const PurchaseEntry = () => {
       </div>
 
       {/* ========================================================================= */}
-      {/* ── STEP 1: SELECT CUSTOMER ACCOUNT ── */}
+      {/* ── STEP 1: SELECT CUSTOMER ACCOUNT & PRODUCT REQUIRED ── */}
       {/* ========================================================================= */}
       {activeTab === 'customer' && (
-        <section className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-6 space-y-6">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2.5">
-              <User size={20} className="text-blue-600" />
-              Select Customer Account
-            </h2>
-            <span className="text-xs font-bold text-blue-700 bg-blue-50 px-3 py-1 rounded-full">
-              Customer Account & Allocation Setup
-            </span>
-          </div>
+        <div className="space-y-6">
+          {/* Select Customer Account Card */}
+          <section className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-6 space-y-6">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2.5">
+                <User size={20} className="text-blue-600" />
+                Select Customer Account
+              </h2>
+              <span className="text-xs font-bold text-blue-700 bg-blue-50 px-3 py-1 rounded-full">
+                Customer Account & Allocation Setup
+              </span>
+            </div>
 
-          {/* Row 1: Select Customer & Purchase Date & Live Remaining Advance */}
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
-            <div className="md:col-span-5">
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                  Customer Account <span className="text-rose-500">*</span>
+            {/* Row 1: Select Customer & Purchase Date & Live Remaining Advance */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+              <div className="md:col-span-5">
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Customer Account <span className="text-rose-500">*</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setIsAddCustomerModalOpen(true)}
+                    className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer bg-blue-50 hover:bg-blue-100 px-2.5 py-0.5 rounded-lg transition-colors"
+                  >
+                    <Plus size={13} /> Add Customer
+                  </button>
+                </div>
+                <select
+                  value={selectedCustomerId}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    setSelectedCustomerId(id);
+                    const cust = customersList.find((c) => c.id === id);
+                    if (cust) {
+                      setStep2Customer(cust.name);
+                      const adv = getCustomerTotalAdvance(cust.id);
+                      setCustomerAdvanceInput(adv ? adv.toString() : '');
+                    }
+                    setFeedback(null);
+                    setCreditFeedback(null);
+                  }}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 cursor-pointer shadow-xs"
+                >
+                  {customersList.length === 0 ? (
+                    <option value="">No customers found - Click + Add Customer</option>
+                  ) : (
+                    customersList.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} ({c.customId || c.id})
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+
+              <div className="md:col-span-3">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Purchase Date
                 </label>
+                <input
+                  type="date"
+                  value={purchaseDate}
+                  onChange={(e) => {
+                    setPurchaseDate(e.target.value);
+                    setStep2Date(e.target.value);
+                  }}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                />
+              </div>
+
+              {/* Live Remaining Advance Display Banner */}
+              <div className="md:col-span-4 bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-3.5 flex items-center justify-between shadow-2xs">
+                <div>
+                  <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">
+                    Customer Remaining Advance
+                  </p>
+                  <p className="text-xl font-black text-emerald-700">
+                    {formatCurrency(remainingAdvance)}
+                  </p>
+                </div>
+                <div className="text-right text-[11px] text-emerald-800 font-medium">
+                  <p>Total Advance: <strong>{formatCurrency(getCustomerTotalAdvance(selectedCustomerId))}</strong></p>
+                </div>
+              </div>
+            </div>
+
+            {/* Row 2: Customer Advance Amt & No. of Cases Input Fields */}
+            <div className="pt-4 border-t border-slate-100 grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+              <div className="md:col-span-6">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Advance Amount (₹)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="Enter Advance Amount"
+                  value={customerAdvanceInput}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setCustomerAdvanceInput(val);
+                  }}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-emerald-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 shadow-2xs"
+                />
+              </div>
+
+              <div className="md:col-span-6">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                  <span>Total Ordered Cases</span>
+                  <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">Manual Entry</span>
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="Enter Total Cases (e.g. 10)"
+                  value={step2CaseCount}
+                  onChange={(e) => setStep2CaseCount(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 shadow-2xs"
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* ── PRODUCT REQUIRED SECTION (Single Entry Row + Added Items Below) ── */}
+          <section className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-6 space-y-5">
+            <datalist id="required-products-datalist">
+              {allProductSuggestions.map((prodName, idx) => (
+                <option key={idx} value={prodName} />
+              ))}
+            </datalist>
+
+            {/* Header: Title + Subtitle and Download PDF & Reset */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+              <div>
+                <div className="flex items-center gap-2.5">
+                  <span className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+                    <Boxes size={20} />
+                  </span>
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                      Product Required
+                      <span className="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200/60 px-2.5 py-0.5 rounded-full">
+                        Customer Requirement Entry
+                      </span>
+                    </h2>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Type product and cases in the entry row. Press <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded text-[10px] font-mono text-slate-700 font-bold">Enter</kbd> in the cases box to add directly below.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Header Action Buttons (Only Reset and Download PDF) */}
+              <div className="flex items-center gap-2">
+                {addedRequiredProducts.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleClearAllRequired}
+                    className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 rounded-xl text-xs font-semibold transition-all cursor-pointer shadow-2xs active:scale-95"
+                    title="Clear list"
+                  >
+                    <RotateCcw size={13} /> Reset
+                  </button>
+                )}
+
                 <button
                   type="button"
-                  onClick={() => setIsAddCustomerModalOpen(true)}
-                  className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer bg-blue-50 hover:bg-blue-100 px-2.5 py-0.5 rounded-lg transition-colors"
+                  onClick={handleDownloadRequiredProducts}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-sm shadow-emerald-600/20 active:scale-95"
+                  title="Download / Print Customer Requirement Sheet"
                 >
-                  <Plus size={13} /> Add Customer
+                  <Download size={15} /> Download PDF
                 </button>
               </div>
-              <select
-                value={selectedCustomerId}
-                onChange={(e) => {
-                  const id = e.target.value;
-                  setSelectedCustomerId(id);
-                  const cust = customersList.find((c) => c.id === id);
-                  if (cust) {
-                    setStep2Customer(cust.name);
-                    const adv = getCustomerTotalAdvance(cust.id);
-                    setCustomerAdvanceInput(adv ? adv.toString() : '');
+            </div>
+
+            {/* Table: Row 1 is Entry Row, and added rows appear below */}
+            <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs bg-white">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50/90 border-b border-slate-200 text-slate-700 font-bold uppercase tracking-wider text-[11px]">
+                    <tr>
+                      <th className="py-3 px-3.5 text-center w-28 text-slate-600">Product ID</th>
+                      <th className="py-3 px-4">Customer Product Required</th>
+                      <th className="py-3 px-4 text-center w-52">Required Cases</th>
+                      <th className="py-3 px-3 text-center w-32 text-slate-500">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {/* ── ROW 1: THE ACTIVE ENTRY ROW ── */}
+                    <tr className={editingRequiredId ? 'bg-amber-50/60' : 'bg-blue-50/30'}>
+                      <td className="py-3 px-3.5 text-center">
+                        {editingRequiredId ? (
+                          <span className="px-2 py-1 bg-amber-500 text-white rounded-md font-extrabold text-[10px] tracking-wide uppercase shadow-2xs">
+                            Edit
+                          </span>
+                        ) : (
+                          <span className="px-2.5 py-1 bg-blue-100 text-blue-800 rounded-md font-mono font-bold text-xs shadow-2xs tracking-wide">
+                            {currentCustNum}-{String(addedRequiredProducts.length + 1).padStart(2, '0')}
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3">
+                        <input
+                          ref={reqProdInputRef}
+                          type="text"
+                          list="required-products-datalist"
+                          placeholder={editingRequiredId ? 'Editing product name...' : 'Type or select product name (e.g. 20 SKY SHOT)...'}
+                          value={reqEntryProduct}
+                          onChange={(e) => setReqEntryProduct(e.target.value)}
+                          onKeyDown={(e) => handleReqKeyDown(e, 'product')}
+                          className="w-full px-3.5 py-2.5 bg-white border border-slate-300 focus:border-blue-600 rounded-xl font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all text-xs shadow-2xs"
+                        />
+                      </td>
+                      <td className="py-2.5 px-3 text-center">
+                        <input
+                          ref={reqCasesInputRef}
+                          type="number"
+                          min="0"
+                          placeholder="Enter Cases (e.g. 10)"
+                          value={reqEntryCases}
+                          onChange={(e) => setReqEntryCases(e.target.value)}
+                          onKeyDown={(e) => handleReqKeyDown(e, 'cases')}
+                          className="w-full px-3 py-2.5 bg-white border border-slate-300 focus:border-blue-600 rounded-xl font-bold text-center text-blue-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all text-xs shadow-2xs"
+                        />
+                      </td>
+                      <td className="py-2.5 px-3 text-center">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={handleAddOrUpdateRequired}
+                            className={`px-3.5 py-2 text-white font-bold text-xs rounded-xl transition-all cursor-pointer shadow-2xs active:scale-95 ${
+                              editingRequiredId
+                                ? 'bg-amber-600 hover:bg-amber-700'
+                                : 'bg-blue-600 hover:bg-blue-700'
+                            }`}
+                            title={editingRequiredId ? 'Save changes' : 'Add to list below (Enter in Cases box)'}
+                          >
+                            {editingRequiredId ? 'Update' : '+ Add'}
+                          </button>
+                          {editingRequiredId && (
+                            <button
+                              type="button"
+                              onClick={handleCancelEditRequired}
+                              className="px-2 py-2 text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 font-semibold text-xs rounded-xl transition-all cursor-pointer"
+                              title="Cancel editing"
+                            >
+                              <X size={14} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+
+                    {/* ── ADDED ITEMS LIST BELOW (kila add akitee varanum) ── */}
+                    {addedRequiredProducts.length > 0 ? (
+                      addedRequiredProducts.map((item, index) => (
+                        <tr
+                          key={item.id}
+                          className={`hover:bg-slate-50/70 transition-colors ${
+                            editingRequiredId === item.id ? 'bg-amber-50/30 font-semibold' : ''
+                          }`}
+                        >
+                          <td className="py-3 px-3.5 text-center font-mono font-bold text-blue-700 text-xs">
+                            {item.productId || `${currentCustNum}-${String(index + 1).padStart(2, '0')}`}
+                          </td>
+                          <td className="py-3 px-4 font-semibold text-slate-900">
+                            {item.productName}
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <span className="inline-flex items-center px-3 py-1 rounded-md text-xs font-bold bg-blue-50 text-blue-700 border border-blue-100">
+                              {item.cases || 0} Cases
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              {/* Edit option */}
+                              <button
+                                type="button"
+                                onClick={() => handleEditRequiredItem(item)}
+                                className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                                title="Edit this item"
+                              >
+                                <Pencil size={15} />
+                              </button>
+                              {/* Delete option */}
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteRequiredItem(item.id)}
+                                className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                title="Delete this item"
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td
+                          colSpan={4}
+                          className="py-6 text-center text-xs text-slate-400 font-medium bg-slate-50/40"
+                        >
+                          No products added yet. Enter product name and cases above and press <kbd className="px-1.5 py-0.5 bg-white border border-slate-200 rounded font-mono text-[10px] text-slate-600">Enter</kbd> in the Cases box to add to this list.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Bottom Summary & Totals Banner with Case Total, Download, and Proceed Button */}
+            <div className="bg-slate-50/80 border border-slate-200/80 rounded-xl p-4 flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="text-xs text-slate-600 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                <span>
+                  <strong>{addedRequiredProducts.length}</strong> items entered for{' '}
+                  <span className="text-blue-700 font-bold">{activeCustomer?.name || 'Selected Customer'}</span>
+                </span>
+              </div>
+
+              {/* Totals Display & Action Buttons */}
+              <div className="flex flex-wrap items-center gap-3">
+                {/* Case Total */}
+                <div className="bg-white border border-blue-200 rounded-xl px-4 py-2 text-center shadow-2xs min-w-[140px]">
+                  <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider block">
+                    Case Total
+                  </span>
+                  <span className="text-base font-black text-blue-800">
+                    {totalRequiredCases} <span className="text-xs font-semibold text-blue-600">Cases</span>
+                  </span>
+                </div>
+
+                {/* Primary Download Button */}
+                <button
+                  type="button"
+                  onClick={handleDownloadRequiredProducts}
+                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs rounded-xl transition-all shadow-sm shadow-emerald-600/25 flex items-center gap-2 cursor-pointer"
+                  title="Download Requirement Sheet as PDF"
+                >
+                  <Download size={16} /> Download
+                </button>
+
+                {/* Proceed to Product Entry & Billing Setup Button (Next to Download, works only after customer & product entered) */}
+                <button
+                  type="button"
+                  onClick={handleProceedToBilling}
+                  disabled={addedRequiredProducts.length === 0}
+                  className={`px-5 py-2.5 font-bold text-xs rounded-xl transition-all flex items-center gap-2 shadow-sm ${
+                    addedRequiredProducts.length > 0
+                      ? 'bg-blue-600 hover:bg-blue-700 active:scale-95 text-white shadow-blue-600/25 cursor-pointer'
+                      : 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-80'
+                  }`}
+                  title={
+                    addedRequiredProducts.length > 0
+                      ? 'Proceed to Product Entry & Billing Setup'
+                      : 'Please select customer and enter at least one product requirement to proceed'
                   }
-                  setFeedback(null);
-                  setCreditFeedback(null);
-                }}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 cursor-pointer shadow-xs"
-              >
-                {customersList.length === 0 ? (
-                  <option value="">No customers found - Click + Add Customer</option>
-                ) : (
-                  customersList.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} ({c.phone || c.id})
-                    </option>
-                  ))
-                )}
-              </select>
-            </div>
-
-            <div className="md:col-span-3">
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                Purchase Date
-              </label>
-              <input
-                type="date"
-                value={purchaseDate}
-                onChange={(e) => {
-                  setPurchaseDate(e.target.value);
-                  setStep2Date(e.target.value);
-                }}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
-              />
-            </div>
-
-            {/* Live Remaining Advance Display Banner */}
-            <div className="md:col-span-4 bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-3.5 flex items-center justify-between shadow-2xs">
-              <div>
-                <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">
-                  Customer Remaining Advance
-                </p>
-                <p className="text-xl font-black text-emerald-700">
-                  {formatCurrency(remainingAdvance)}
-                </p>
-              </div>
-              <div className="text-right text-[11px] text-emerald-800 font-medium">
-                <p>Total Advance: <strong>{formatCurrency(getCustomerTotalAdvance(selectedCustomerId))}</strong></p>
+                >
+                  Proceed to Product Entry & Billing Setup →
+                </button>
               </div>
             </div>
-          </div>
-
-          {/* Row 2: Customer Advance Amt & No. of Cases Input Fields */}
-          <div className="pt-4 border-t border-slate-100 grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-            <div className="md:col-span-4">
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                Advance Amount (₹)
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                placeholder="Enter Advance Amount"
-                value={customerAdvanceInput}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setCustomerAdvanceInput(val);
-                }}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-emerald-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 shadow-2xs"
-              />
-            </div>
-
-            <div className="md:col-span-4">
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
-                <span>Total Ordered Cases</span>
-                <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">Manual Entry</span>
-              </label>
-              <input
-                type="number"
-                min="0"
-                placeholder="Enter Total Cases (e.g. 10)"
-                value={step2CaseCount}
-                onChange={(e) => setStep2CaseCount(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 shadow-2xs"
-              />
-            </div>
-
-            <div className="md:col-span-4">
-              <button
-                type="button"
-                onClick={() => setActiveTab('product')}
-                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl transition-all shadow-sm cursor-pointer flex items-center justify-center gap-2"
-              >
-                Proceed to Product Entry & Billing Setup →
-              </button>
-            </div>
-          </div>
-        </section>
+          </section>
+        </div>
       )}
 
       {/* ========================================================================= */}
@@ -966,8 +1538,11 @@ const PurchaseEntry = () => {
           <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
             {/* Particular dropdown */}
             <div className="md:col-span-4">
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Particular
+              <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                <span>Particular</span>
+                <span className="font-mono text-[11px] font-extrabold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                  Item ID: {editingRowIndex !== null ? (productRows[editingRowIndex]?.productId || `${currentCustNum}-${String(editingRowIndex + 1).padStart(2, '0')}`) : `${currentCustNum}-${String(productRows.length + 1).padStart(2, '0')}`}
+                </span>
               </label>
               <div className="relative flex items-center">
                 <select
@@ -1112,6 +1687,9 @@ const PurchaseEntry = () => {
           <table className="w-full text-left text-xs border-collapse">
             <thead className="bg-slate-100 border-b border-slate-200">
               <tr>
+                <th className="py-3 px-4 font-bold text-slate-700 uppercase w-28 text-center">
+                  PRODUCT ID
+                </th>
                 <th className="py-3 px-4 font-bold text-slate-700 uppercase">
                   PARTICULAR
                 </th>
@@ -1140,6 +1718,9 @@ const PurchaseEntry = () => {
                     editingRowIndex === idx ? 'bg-blue-50/50' : ''
                   }`}
                 >
+                  <td className="py-3 px-4 font-mono font-bold text-blue-700 text-xs text-center">
+                    {row.productId || `${currentCustNum}-${String(idx + 1).padStart(2, '0')}`}
+                  </td>
                   <td className="py-3 px-4 font-bold text-slate-900">
                     {row.particular}
                   </td>
@@ -1188,7 +1769,7 @@ const PurchaseEntry = () => {
               {productRows.length === 0 && (
                 <tr>
                   <td
-                    colSpan="6"
+                    colSpan="7"
                     className="text-center py-8 text-slate-400 font-medium"
                   >
                     No products added to table yet. Fill the row above and click + to add.
@@ -1903,6 +2484,19 @@ const PurchaseEntry = () => {
         title="Add New Customer"
       >
         <form onSubmit={handleQuickAddCustomer} className="space-y-4">
+          {/* Sequential Customer ID Badge */}
+          <div className="flex items-center justify-between px-4 py-2 bg-blue-50/80 border border-blue-200/80 rounded-xl">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                Assigned ID:
+              </span>
+              <span className="font-mono font-extrabold text-blue-700 bg-white px-2.5 py-0.5 rounded-md border border-blue-200 shadow-2xs text-xs">
+                {getNextCustomerId ? getNextCustomerId(customersList) : `CUST-${101 + customersList.length}`}
+              </span>
+            </div>
+            <span className="text-[11px] font-semibold text-blue-600">Auto Sequential ID</span>
+          </div>
+
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
               Customer / Business Name <span className="text-rose-500">*</span>
