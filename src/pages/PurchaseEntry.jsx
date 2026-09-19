@@ -105,12 +105,12 @@ const PurchaseEntry = () => {
       }));
       setCustomersList(mapped);
 
-      // Ensure selectedCustomerId is pointing to an existing customer in the live list
+      // Ensure selectedCustomerId is pointing to an existing customer in the live list if set
       setSelectedCustomerId((prevId) => {
         if (prevId && mapped.some((m) => m.id === prevId)) {
           return prevId;
         }
-        return mapped[0]?.id || '';
+        return '';
       });
     } else {
       setCustomersList([]);
@@ -156,10 +156,8 @@ const PurchaseEntry = () => {
   // Active Sub-Tab State inside Performo Page (Default: Select Customer Account)
   const [activeTab, setActiveTab] = useState('customer');
 
-  // Selected customer & purchase date
-  const [selectedCustomerId, setSelectedCustomerId] = useState(
-    customersList[0]?.id || 'CUST-101'
-  );
+  // Selected customer & purchase date (empty by default)
+  const [selectedCustomerId, setSelectedCustomerId] = useState('');
 
   // Helper to extract customer numeric prefix (e.g. '101' from 'CUST-101')
   const getCustomerNumber = (custIdOrObj) => {
@@ -304,7 +302,7 @@ const PurchaseEntry = () => {
 
   // Step 2 Billing & Customer Form Controls State
   const [step2Customer, setStep2Customer] = useState('');
-  const [step2CaseCount, setStep2CaseCount] = useState('0');
+  const [step2CaseCount, setStep2CaseCount] = useState('');
   const [step2Company, setStep2Company] = useState('SIMBA FW');
   const [step2Discount, setStep2Discount] = useState('');
   const [step2Transport, setStep2Transport] = useState('');
@@ -326,7 +324,7 @@ const PurchaseEntry = () => {
     return (maxNum + 1).toString();
   };
 
-  const [step2BillNo, setStep2BillNo] = useState('101001');
+  const [step2BillNo, setStep2BillNo] = useState('');
   const [step2Tax, setStep2Tax] = useState('');
   const [step2Date, setStep2Date] = useState(getTodayDateString());
 
@@ -367,12 +365,12 @@ const PurchaseEntry = () => {
             (p) => p.name?.toLowerCase() === item.productName?.toLowerCase()
           );
           const caseReq = parseFloat(item.cases) || 0;
-          // Initial rate starts empty with placeholder '0' and stock out (caseOut) starts at '0'
-          const caseOutVal = existing && existing.caseOut !== undefined ? existing.caseOut : '0';
+          // Initial rate and case out start empty with placeholders
+          const caseOutVal = existing && existing.caseOut !== undefined ? existing.caseOut : '';
           const rateVal = existing && existing.rate !== undefined && existing.rate !== '' ? existing.rate : '';
-          const pktUnitsVal = existing && existing.pktUnits !== undefined && existing.pktUnits !== '' && existing.pktUnits !== 1 && existing.pktUnits !== '1'
+          const pktUnitsVal = existing && existing.pktUnits !== undefined && existing.pktUnits !== null
             ? existing.pktUnits
-            : '';
+            : (item.pktUnits || '');
 
           const cOutNum = parseFloat(caseOutVal) || 0;
           const rNum = parseFloat(rateVal) || 0;
@@ -575,7 +573,7 @@ const PurchaseEntry = () => {
         );
         const caseNum = parseFloat(item.cases) || 1;
         const rateNum = prodMatch?.customerRate || prodMatch?.rate || 0;
-        const pktUnitsNum = item.pktUnits && item.pktUnits !== '1' && item.pktUnits !== 1 ? item.pktUnits : '';
+        const pktUnitsNum = item.pktUnits !== undefined && item.pktUnits !== null ? item.pktUnits : '';
         const totalUnitsNum = caseNum * (parseFloat(pktUnitsNum) || 1);
         const amountNum = totalUnitsNum * rateNum;
 
@@ -1372,27 +1370,26 @@ const PurchaseEntry = () => {
                     const cust = customersList.find((c) => c.id === id);
                     if (cust) {
                       setStep2Customer(cust.name);
-                      setCustomerAdvanceInput('0');
+                    } else {
+                      setStep2Customer('');
                     }
+                    setCustomerAdvanceInput('');
                     setFeedback(null);
                     setCreditFeedback(null);
                   }}
                   className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 cursor-pointer shadow-xs"
                 >
-                  {customersList.length === 0 ? (
-                    <option value="">No customers found - Click + Add Customer</option>
-                  ) : (
-                    customersList.map((c) => {
-                      const rem = getCustomerRemainingAdvance
-                        ? getCustomerRemainingAdvance(c.id)
-                        : ((c.credit || 0) - (c.debit || 0));
-                      return (
-                        <option key={c.id} value={c.id}>
-                          {c.name} ({c.customId || c.id}){rem !== 0 ? ` • [Remaining: ${formatCurrency(rem)}]` : ''}
-                        </option>
-                      );
-                    })
-                  )}
+                  <option value="">Select Customer Account</option>
+                  {customersList.map((c) => {
+                    const rem = getCustomerRemainingAdvance
+                      ? getCustomerRemainingAdvance(c.id)
+                      : ((c.credit || 0) - (c.debit || 0));
+                    return (
+                      <option key={c.id} value={c.id}>
+                        {c.name} ({c.customId || c.id}){rem !== 0 ? ` • [Remaining: ${formatCurrency(rem)}]` : ''}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 
@@ -1413,7 +1410,26 @@ const PurchaseEntry = () => {
 
               {/* Dynamic Status Banner: Customer Remaining Amount */}
               <div className="md:col-span-4">
-                {isCurrentCustomerNew ? (
+                {!selectedCustomerId ? (
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 flex items-center justify-between shadow-2xs">
+                    <div>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                        Customer Account Status
+                      </p>
+                      <p className="text-base font-black text-slate-700 mt-0.5">
+                        Select Customer Account
+                      </p>
+                      <p className="text-[11px] text-slate-400 font-medium mt-0.5">
+                        Choose a customer above or click + Add Customer
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <span className="inline-block px-2.5 py-1 bg-slate-100 border border-slate-200 text-slate-500 rounded-lg text-[10px] font-extrabold uppercase tracking-wider">
+                        No Customer
+                      </span>
+                    </div>
+                  </div>
+                ) : isCurrentCustomerNew ? (
                   <div className="bg-gradient-to-br from-sky-50 to-blue-50 border border-blue-200 rounded-xl p-3.5 flex items-center justify-between shadow-2xs">
                     <div>
                       <p className="text-[10px] font-bold text-blue-800 uppercase tracking-wider">
@@ -1529,7 +1545,7 @@ const PurchaseEntry = () => {
                   type="text"
                   readOnly
                   placeholder="0 Cases"
-                  value={`${totalRequiredCases} Cases`}
+                  value={totalRequiredCases > 0 ? `${totalRequiredCases} Cases` : ''}
                   className="w-full px-4 py-3 bg-slate-100/90 border border-slate-200 rounded-xl text-sm font-black text-blue-700 focus:outline-none shadow-2xs cursor-not-allowed"
                 />
               </div>
@@ -1894,7 +1910,10 @@ const PurchaseEntry = () => {
                     <th className="py-3.5 px-3.5 text-center w-28">
                       PRODUCT ID
                     </th>
-                    <th className="py-3.5 px-4 min-w-[200px]">
+                    <th className="py-3.5 px-3 min-w-[180px]">
+                      COMPANY NAME
+                    </th>
+                    <th className="py-3.5 px-4 min-w-[180px]">
                       PRODUCT NAME
                     </th>
                     <th className="py-3.5 px-4 text-center w-32">
@@ -1936,32 +1955,18 @@ const PurchaseEntry = () => {
                             {row.productId || `${currentCustNum}-${String(idx + 1).padStart(2, '0')}`}
                           </span>
                         </td>
-                        <td className="py-2.5 px-4 min-w-[200px]">
+                        <td className="py-2.5 px-3 min-w-[140px]">
+                          {row.companyName ? (
+                            <span className="inline-block px-2.5 py-1 bg-slate-100 text-slate-800 rounded-md font-semibold text-[11px] border border-slate-200 whitespace-nowrap">
+                              {row.companyName}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 text-xs italic font-medium">-</span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-4 min-w-[180px]">
                           <div className="font-bold text-slate-900 text-xs leading-snug">
                             {row.particular || row.productName}
-                          </div>
-                          <div className="mt-1.5 flex items-center gap-1.5">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0">
-                              Co:
-                            </span>
-                            <div className="relative inline-block w-full max-w-[170px]">
-                              <select
-                                value={row.companyName || ''}
-                                onChange={(e) => handleRowFieldChange(idx, 'companyName', e.target.value)}
-                                className="w-full text-[11px] font-semibold bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:border-blue-500 rounded-md pl-2 pr-6 py-1 text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all cursor-pointer shadow-2xs appearance-none truncate"
-                              >
-                                <option value="">Select Company</option>
-                                {allCompanyOptions.map((comp) => (
-                                  <option key={comp} value={comp}>
-                                    {comp}
-                                  </option>
-                                ))}
-                              </select>
-                              <ChevronDown
-                                size={12}
-                                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
-                              />
-                            </div>
                           </div>
                         </td>
                         <td className="py-3 px-4 text-center">
@@ -1975,7 +1980,7 @@ const PurchaseEntry = () => {
                             min="0"
                             max={cReq}
                             placeholder="0"
-                            value={row.caseOut !== undefined ? row.caseOut : '0'}
+                            value={row.caseOut !== undefined && row.caseOut !== null ? row.caseOut : ''}
                             onChange={(e) => handleRowFieldChange(idx, 'caseOut', e.target.value)}
                             className="w-24 px-2.5 py-1.5 text-center font-bold text-xs text-blue-700 bg-blue-50/40 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all shadow-2xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           />
@@ -1999,7 +2004,7 @@ const PurchaseEntry = () => {
                               step="0.01"
                               min="0"
                               placeholder="0.00"
-                              value={row.rate !== undefined ? row.rate : '0.00'}
+                              value={row.rate !== undefined && row.rate !== null && row.rate !== '0.00' && row.rate !== 0 && row.rate !== '0' ? row.rate : ''}
                               onChange={(e) => handleRowFieldChange(idx, 'rate', e.target.value)}
                               className="w-full pl-6 pr-2 py-1.5 text-center font-bold text-xs text-slate-900 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-2xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             />
@@ -2010,7 +2015,7 @@ const PurchaseEntry = () => {
                             type="number"
                             min="1"
                             placeholder="1"
-                            value={row.pktUnits && row.pktUnits !== '1' && row.pktUnits !== 1 && row.pktUnits !== '0' && row.pktUnits !== 0 ? row.pktUnits : ''}
+                            value={row.pktUnits !== undefined && row.pktUnits !== null ? row.pktUnits : ''}
                             onChange={(e) => handleRowFieldChange(idx, 'pktUnits', e.target.value)}
                             className="w-20 px-2.5 py-1.5 text-center font-bold text-xs text-slate-800 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-2xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           />
@@ -2035,7 +2040,7 @@ const PurchaseEntry = () => {
                   {productRows.length === 0 && (
                     <tr>
                       <td
-                        colSpan="9"
+                        colSpan="10"
                         className="text-center py-10 px-4 text-slate-500 bg-slate-50/50"
                       >
                         <div className="max-w-md mx-auto space-y-3">
@@ -2077,7 +2082,7 @@ const PurchaseEntry = () => {
                       onChange={(e) => setStep2Customer(e.target.value)}
                       className="w-full pl-3 pr-8 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 cursor-pointer shadow-2xs appearance-none"
                     >
-                      <option value="SAI MOHAN M...">SAI MOHAN M...</option>
+                      <option value="">Select Customer</option>
                       {customersList.map((c) => (
                         <option key={c.id} value={c.name}>
                           {c.name}
@@ -2100,7 +2105,7 @@ const PurchaseEntry = () => {
                   <input
                     type="text"
                     required
-                    placeholder="Enter Bill No"
+                    placeholder={getNextAutoBillNo() || '101001'}
                     value={step2BillNo}
                     onChange={(e) => setStep2BillNo(e.target.value)}
                     className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900 font-mono placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 shadow-2xs"
@@ -2119,7 +2124,8 @@ const PurchaseEntry = () => {
                   <input
                     type="number"
                     readOnly
-                    value={totalAddedCases}
+                    placeholder="0"
+                    value={totalAddedCases > 0 ? totalAddedCases : ''}
                     className="w-full px-3 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-black text-blue-700 focus:outline-none shadow-2xs cursor-not-allowed"
                   />
                 </div>
