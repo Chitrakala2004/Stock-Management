@@ -66,6 +66,8 @@ const PurchaseEntry = () => {
     products: contextProducts = [],
     getCustomerRemainingAdvance = () => 0,
     getCustomerTotalAdvance = () => 0,
+    getCustomerTotalPurchases = () => 0,
+    getCustomerPendingAmount = () => 0,
     getNextCustomerId,
     addCustomer,
     addAdvancePayment,
@@ -208,8 +210,19 @@ const PurchaseEntry = () => {
       const cust = customersList.find((c) => c.id === selectedCustomerId);
       if (cust) {
         setStep2Customer(cust.name);
-        const adv = getCustomerTotalAdvance(cust.id);
-        setCustomerAdvanceInput(adv ? adv.toString() : '');
+        const pending = getCustomerPendingAmount
+          ? getCustomerPendingAmount(cust.id)
+          : Math.max(0, (cust.debit || 0) - (cust.credit || 0));
+        const remAdv = getCustomerRemainingAdvance
+          ? getCustomerRemainingAdvance(cust.id)
+          : Math.max(0, (cust.credit || 0) - (cust.debit || 0));
+        
+        // If customer is new or has pending dues or no advance: advance input defaults to '0'
+        if (pending > 0 || remAdv <= 0) {
+          setCustomerAdvanceInput('0');
+        } else {
+          setCustomerAdvanceInput(remAdv.toString());
+        }
       }
     }
   }, [selectedCustomerId, customersList]);
@@ -221,7 +234,7 @@ const PurchaseEntry = () => {
     phone: '',
     gst: '',
     address: '',
-    advanceAmount: '',
+    advanceAmount: '0',
   });
 
   const handleQuickAddCustomer = async (e) => {
@@ -266,14 +279,14 @@ const PurchaseEntry = () => {
 
     setSelectedCustomerId(createdId);
     setStep2Customer(payload.name);
-    setCustomerAdvanceInput(initAdv ? initAdv.toString() : '');
+    setCustomerAdvanceInput(initAdv ? initAdv.toString() : '0');
 
     setNewCustomerForm({
       name: '',
       phone: '',
       gst: '',
       address: '',
-      advanceAmount: '',
+      advanceAmount: '0',
     });
     setIsAddCustomerModalOpen(false);
 
@@ -298,9 +311,37 @@ const PurchaseEntry = () => {
   const [step2Discount, setStep2Discount] = useState('');
   const [step2Transport, setStep2Transport] = useState('');
   const [step2Packing, setStep2Packing] = useState('');
-  const [step2BillNo, setStep2BillNo] = useState('101');
+  // Auto-generate 6-digit bill numbers sequentially like 101001, 101002, 101003...
+  const getNextAutoBillNo = () => {
+    const allExistingBills = [
+      ...(contextPurchases || []),
+      ...(performoBills || []),
+    ];
+    let maxNum = 101000;
+    allExistingBills.forEach((b) => {
+      const bNo = b.billNo || (b.purchaseId ? b.purchaseId.replace('PRF-', '') : '');
+      const parsed = parseInt(bNo, 10);
+      if (!isNaN(parsed) && parsed >= 101000 && parsed > maxNum) {
+        maxNum = parsed;
+      }
+    });
+    return (maxNum + 1).toString();
+  };
+
+  const [step2BillNo, setStep2BillNo] = useState('101001');
   const [step2Tax, setStep2Tax] = useState('');
   const [step2Date, setStep2Date] = useState('2026-09-17');
+
+  // Prevent mouse wheel from incrementing/decrementing any number inputs across page
+  useEffect(() => {
+    const handleWheel = (e) => {
+      if (document.activeElement && document.activeElement.type === 'number') {
+        document.activeElement.blur();
+      }
+    };
+    window.addEventListener('wheel', handleWheel, { passive: true });
+    return () => window.removeEventListener('wheel', handleWheel);
+  }, []);
 
   // Product Table Rows State
   const [productRows, setProductRows] = useState([]);
@@ -313,6 +354,51 @@ const PurchaseEntry = () => {
   // ── Product Required Section State (Customer Product Requirement Table) ──
   // Added products list (initially empty; items are appended below as user presses Enter)
   const [addedRequiredProducts, setAddedRequiredProducts] = useState([]);
+
+  // Auto-sync productRows from addedRequiredProducts (Customer Product Required)
+  useEffect(() => {
+    if (addedRequiredProducts && addedRequiredProducts.length > 0) {
+      setProductRows((prevRows) => {
+        return addedRequiredProducts.map((item, idx) => {
+          const existing = prevRows.find(
+            (r) =>
+              (r.requiredId && r.requiredId === item.id) ||
+              r.particular?.toLowerCase() === item.productName?.toLowerCase()
+          );
+          const prodMatch = (contextProducts || []).find(
+            (p) => p.name?.toLowerCase() === item.productName?.toLowerCase()
+          );
+          const caseReq = parseFloat(item.cases) || 0;
+          // Initial rate starts empty with placeholder '0' and stock out (caseOut) starts at '0'
+          const caseOutVal = existing && existing.caseOut !== undefined ? existing.caseOut : '0';
+          const rateVal = existing && existing.rate !== undefined && existing.rate !== '' ? existing.rate : '';
+          const pktUnitsVal = existing && existing.pktUnits !== undefined ? existing.pktUnits : (prodMatch?.piecesPerCase || prodMatch?.caseQuantity || 1);
+
+          const cOutNum = parseFloat(caseOutVal) || 0;
+          const rNum = parseFloat(rateVal) || 0;
+          const uNum = parseFloat(pktUnitsVal) || 1;
+          const amountNum = rNum * cOutNum * uNum;
+          const remCases = Math.max(0, caseReq - cOutNum);
+
+          return {
+            requiredId: item.id,
+            productId: existing?.productId || `${currentCustNum}-${String(idx + 1).padStart(2, '0')}`,
+            particular: item.productName,
+            productName: item.productName,
+            caseRequired: caseReq,
+            caseOut: caseOutVal,
+            remainingCases: remCases,
+            caseCount: cOutNum,
+            rate: rateVal,
+            pktUnits: pktUnitsVal,
+            totalUnits: cOutNum * uNum,
+            amount: amountNum,
+            rateMode: 'case',
+          };
+        });
+      });
+    }
+  }, [addedRequiredProducts, currentCustNum, contextProducts]);
 
   // Active single entry row input state (Only Product Name and Cases; Amount removed)
   const [reqEntryProduct, setReqEntryProduct] = useState('');
@@ -431,6 +517,11 @@ const PurchaseEntry = () => {
     const val = parseFloat(item.cases);
     return sum + (!isNaN(val) && val > 0 ? val : 0);
   }, 0);
+
+  // Auto-sync step2CaseCount whenever product requirements change
+  useEffect(() => {
+    setStep2CaseCount(totalRequiredCases.toString());
+  }, [totalRequiredCases]);
 
   // Proceed to Product Entry & Billing Setup Handler
   // Only works after selecting customer account and entering product requirements!
@@ -698,11 +789,6 @@ const PurchaseEntry = () => {
   // Formula: Product amount = Total Units × Rate (e.g. 50 × ₹20 = ₹1,000.00)
   const calculatedEntryAmount = (pktUnitsVal > 0 ? totalUnitsCalculated : casesVal) * rateVal;
 
-  // Customer Remaining Advance
-  const remainingAdvance = selectedCustomerId
-    ? getCustomerRemainingAdvance(selectedCustomerId)
-    : 0;
-
   // Filter transactions for active customer
   const customerTransactionsList = transactions.filter(
     (t) =>
@@ -716,6 +802,34 @@ const PurchaseEntry = () => {
       b.customerId === activeCustomer?.id ||
       b.customer?.toLowerCase() === activeCustomer?.name?.toLowerCase()
   );
+
+  // Active Customer Financial Status: Pending Amount vs Remaining Advance
+  const currentCustPending = selectedCustomerId
+    ? (getCustomerPendingAmount
+        ? getCustomerPendingAmount(selectedCustomerId)
+        : Math.max(0, (activeCustomer?.debit || 0) - (activeCustomer?.credit || 0)))
+    : 0;
+
+  const currentCustRemainingAdv = selectedCustomerId
+    ? Math.max(
+        0,
+        getCustomerRemainingAdvance
+          ? getCustomerRemainingAdvance(selectedCustomerId)
+          : (activeCustomer?.credit || 0) - (activeCustomer?.debit || 0)
+      )
+    : 0;
+
+  const isCurrentCustomerNew = selectedCustomerId
+    ? ((activeCustomer?.debit || 0) === 0 &&
+        (activeCustomer?.credit || 0) === 0 &&
+        (!customerPerformoBills || customerPerformoBills.length === 0))
+    : true;
+
+  // Customer Remaining Advance: prioritize manual advance input entered by admin
+  const userEnteredAdvance = customerAdvanceInput !== '' ? (parseFloat(customerAdvanceInput) || 0) : null;
+  const remainingAdvance = userEnteredAdvance !== null
+    ? userEnteredAdvance
+    : (currentCustRemainingAdv > 0 ? currentCustRemainingAdv : 0);
 
   const handleDeleteTransaction = (id) => {
     setTransactions(transactions.filter((t) => t.id !== id));
@@ -798,6 +912,41 @@ const PurchaseEntry = () => {
     setEditingRowIndex(index);
   };
 
+  // Handle Inline Product Row Editing (Case Out, Rate, Pkt / Units)
+  const handleRowFieldChange = (index, field, value) => {
+    setProductRows((prev) => {
+      const updated = [...prev];
+      const row = { ...updated[index] };
+      const caseReqVal = parseFloat(row.caseRequired !== undefined ? row.caseRequired : (row.caseCount || 0)) || 0;
+
+      let finalValue = value;
+      if (field === 'caseOut') {
+        const numVal = parseFloat(value);
+        if (!isNaN(numVal)) {
+          if (numVal > caseReqVal) {
+            // Case out cannot exceed case required
+            finalValue = caseReqVal.toString();
+          } else if (numVal < 0) {
+            finalValue = '0';
+          }
+        }
+      }
+
+      row[field] = finalValue;
+
+      const caseOutVal = parseFloat(field === 'caseOut' ? finalValue : row.caseOut) || 0;
+      const rateVal = parseFloat(field === 'rate' ? finalValue : row.rate) || 0;
+      const unitsVal = parseFloat(field === 'pktUnits' ? finalValue : row.pktUnits) || 1;
+
+      row.amount = rateVal * caseOutVal * unitsVal;
+      row.totalUnits = caseOutVal * unitsVal;
+      row.caseCount = caseOutVal;
+      row.remainingCases = Math.max(0, caseReqVal - caseOutVal);
+      updated[index] = row;
+      return updated;
+    });
+  };
+
   // Delete Row
   const handleDeleteRow = (index) => {
     setProductRows(productRows.filter((_, i) => i !== index));
@@ -810,113 +959,181 @@ const PurchaseEntry = () => {
   };
 
   // Summary Card & Dynamic Deductions Calculations
-  const totalAddedCases = productRows.reduce((sum, row) => sum + (parseFloat(row.caseCount) || 0), 0);
+  const totalAddedCases = productRows.reduce((sum, row) => sum + (parseFloat(row.caseOut !== undefined ? row.caseOut : row.caseCount) || 0), 0);
+  const totalRequiredCasesInTable = productRows.reduce((sum, row) => sum + (parseFloat(row.caseRequired) || 0), 0);
   const subtotalAmount = productRows.reduce((sum, row) => sum + (parseFloat(row.amount) || 0), 0);
 
-  const initialCasesAllocated = parseFloat(step2CaseCount) || 0;
-  const initialAdvanceAmt = getCustomerTotalAdvance(selectedCustomerId) || parseFloat(customerAdvanceInput) || 0;
-
-  // Dynamic Reductions as products are added/accumulated in table
-  const dynamicRemainingCases = initialCasesAllocated - totalAddedCases;
-  const dynamicRemainingAdvance = initialAdvanceAmt > 0
-    ? Math.max(0, initialAdvanceAmt - subtotalAmount)
-    : 0;
+  const initialCasesAllocated = totalRequiredCasesInTable > 0 ? totalRequiredCasesInTable : (parseFloat(step2CaseCount) || 0);
+  const initialAdvanceAmt = userEnteredAdvance !== null
+    ? userEnteredAdvance
+    : (getCustomerTotalAdvance(selectedCustomerId) || (activeCustomer ? activeCustomer.credit : 0) || 0);
 
   const discountVal = parseFloat(step2Discount) || 0;
-  const transportVal = parseFloat(step2Transport) || 0;
+  const transportVal = 0; // Transport removed as per user requirement
   const packingVal = parseFloat(step2Packing) || 0;
-  const taxVal = parseFloat(step2Tax) || 0;
+  const taxAmount = parseFloat(step2Tax) || 0; // Direct manual Rupee Amount
 
   const discountAmount = (subtotalAmount * discountVal) / 100;
   const packingAmount = (subtotalAmount * packingVal) / 100;
-  const taxableBase = subtotalAmount - discountAmount + packingAmount;
-  const taxAmount = (taxableBase * taxVal) / 100;
 
   const grandTotalAmount =
-    subtotalAmount - discountAmount + packingAmount + transportVal + taxAmount;
+    subtotalAmount - discountAmount + packingAmount + taxAmount;
+
+  // Dynamic Reductions as products are added/accumulated in table
+  const dynamicRemainingCases = initialCasesAllocated - totalAddedCases;
+  const totalPayableWithPending = grandTotalAmount + currentCustPending;
+  const balanceAmount = initialAdvanceAmt - totalPayableWithPending;
+  const dynamicRemainingAdvance = initialAdvanceAmt - grandTotalAmount;
 
   // Create Performo Invoice
   const handleCreateInvoice = (e) => {
     if (e && e.preventDefault) e.preventDefault();
 
-    let currentBillNo = step2BillNo.trim();
-    if (!currentBillNo) {
-      currentBillNo = (101 + performoBills.length).toString();
-      setStep2BillNo(currentBillNo);
-    }
+    try {
+      let currentBillNo = step2BillNo.trim();
+      if (!currentBillNo) {
+        currentBillNo = getNextAutoBillNo();
+        setStep2BillNo(currentBillNo);
+      }
 
-    if (productRows.length === 0) {
+      if (productRows.length === 0) {
+        alert('Product table is empty. Please add product requirements in Step 1 first.');
+        setFeedback({
+          type: 'error',
+          message: 'Product table is empty. Add at least one product before creating.',
+        });
+        return;
+      }
+
+      const targetCustomerName =
+        step2Customer && step2Customer !== 'SAI MOHAN M...'
+          ? step2Customer
+          : activeCustomer
+          ? activeCustomer.name
+          : 'SAI MOHAN MARKETING';
+
+      // 1. Update customer debit balance
+      if (activeCustomer) {
+        setCustomersList((prev) =>
+          prev.map((c) =>
+            c.id === activeCustomer.id
+              ? { ...c, debit: c.debit + grandTotalAmount }
+              : c
+          )
+        );
+      }
+
+      // 2. Add new Performo Bill
+      const billItems = productRows.map((row) => ({
+        productId: row.productId,
+        particular: row.particular || row.productName,
+        productName: row.particular || row.productName,
+        brand: step2Company || 'SIMBA FW',
+        caseRequired: parseFloat(row.caseRequired) || 0,
+        caseOut: parseFloat(row.caseOut) || 0,
+        caseCount: parseFloat(row.caseOut) || 0,
+        rate: parseFloat(row.rate) || 0,
+        pktUnits: parseFloat(row.pktUnits) || 1,
+        totalUnits: (parseFloat(row.caseOut) || 0) * (parseFloat(row.pktUnits) || 1),
+        amount: parseFloat(row.amount) || 0,
+        pendingCases: Math.max(0, (parseFloat(row.caseRequired) || 0) - (parseFloat(row.caseOut) || 0)),
+        dispatchedCases: parseFloat(row.caseOut) || 0,
+      }));
+
+      const newBill = {
+        id: `PRF-BILL-${Date.now()}`,
+        purchaseId: `PRF-${currentBillNo}`,
+        billNo: currentBillNo,
+        customer: targetCustomerName,
+        customerName: targetCustomerName,
+        customerId: activeCustomer ? activeCustomer.id : 'CUST-101',
+        companyName: step2Company || 'SIMBA FW',
+        date: step2Date || purchaseDate,
+        subtotal: subtotalAmount,
+        discount: discountAmount,
+        packing: packingAmount,
+        tax: taxAmount,
+        netTotal: grandTotalAmount,
+        previousPending: currentCustPending,
+        totalPayable: totalPayableWithPending,
+        transport: 0,
+        debit: grandTotalAmount,
+        credit: initialAdvanceAmt,
+        netBalance: totalPayableWithPending - initialAdvanceAmt,
+        status: 'Confirmed',
+        items: billItems,
+      };
+      setPerformoBills((prev) => [newBill, ...prev]);
+
+      // Save permanently in database via context
+      if (stockContext?.addPurchaseBill) {
+        stockContext.addPurchaseBill(newBill);
+      }
+      if (stockContext?.addDispatch) {
+        stockContext.addDispatch({
+          dispatchId: `DSP-${currentBillNo}-${Date.now().toString().slice(-4)}`,
+          customerId: activeCustomer ? activeCustomer.id : 'CUST-101',
+          customerName: targetCustomerName,
+          customerPhone: activeCustomer?.phone || '',
+          date: step2Date || purchaseDate,
+          items: billItems,
+          subtotal: subtotalAmount,
+          discount: discountAmount,
+          packing: packingAmount,
+          tax: taxAmount,
+          totalAmount: totalPayableWithPending,
+          currentBillAmount: grandTotalAmount,
+          previousPending: currentCustPending,
+          advanceAmount: initialAdvanceAmt,
+          balanceAmount: balanceAmount,
+          status: 'Dispatched',
+        });
+      }
+
+      // If admin entered an advance for customer, ensure it is recorded
+      if (userEnteredAdvance !== null && userEnteredAdvance > 0 && addAdvancePayment) {
+        const existingAdv = getCustomerTotalAdvance(activeCustomer?.id);
+        if (!existingAdv || existingAdv === 0) {
+          addAdvancePayment({
+            customerId: activeCustomer?.id || 'CUST-101',
+            customerName: targetCustomerName,
+            amount: userEnteredAdvance,
+            date: step2Date || purchaseDate,
+            paymentReference: `ADV-${currentBillNo}`,
+            paymentMethod: 'Cash',
+          });
+        }
+      }
+
+      // 3. Add to ledger transactions history
+      const newTxn = {
+        id: `TXN-${Date.now()}`,
+        customerId: activeCustomer ? activeCustomer.id : 'CUST-101',
+        customerName: targetCustomerName,
+        date: step2Date || purchaseDate,
+        companyName: step2Company || 'SIMBA FW',
+        debit: grandTotalAmount,
+        credit: 0.00,
+        balance: (activeCustomer ? activeCustomer.debit : 0) + grandTotalAmount,
+      };
+      setTransactions((prev) => [newTxn, ...prev]);
+
       setFeedback({
-        type: 'error',
-        message: 'Product table is empty. Add at least one product before creating.',
+        type: 'success',
+        message: `✅ Bill #${currentBillNo} Created Successfully!`,
+        details: `${formatCurrency(grandTotalAmount)} billed to ${targetCustomerName}${currentCustPending > 0 ? ` (Previous Pending: ${formatCurrency(currentCustPending)} included)` : ''}. Balance: ${formatCurrency(balanceAmount)}. Switched to Performo Details.`,
       });
-      return;
+
+      // Increment bill number for next bill sequentially like 101001 -> 101002
+      const nextBillNo = (parseInt(currentBillNo, 10) + 1 || 101002).toString();
+      setStep2BillNo(nextBillNo);
+
+      // Auto-navigate to Performo Details tab to show created bill
+      setActiveTab('performo');
+    } catch (err) {
+      console.error('Invoice creation error:', err);
+      alert('Error creating bill: ' + (err.message || err));
     }
-
-    const targetCustomerName =
-      step2Customer && step2Customer !== 'SAI MOHAN M...'
-        ? step2Customer
-        : activeCustomer
-        ? activeCustomer.name
-        : 'SAI MOHAN MARKETING';
-
-    // 1. Update customer debit balance
-    if (activeCustomer) {
-      setCustomersList((prev) =>
-        prev.map((c) =>
-          c.id === activeCustomer.id
-            ? { ...c, debit: c.debit + grandTotalAmount }
-            : c
-        )
-      );
-    }
-
-    // 2. Add new Performo Bill
-    const newBill = {
-      id: `PRF-BILL-${Date.now()}`,
-      purchaseId: `PRF-${currentBillNo}`,
-      billNo: currentBillNo,
-      customer: targetCustomerName,
-      companyName: step2Company || 'SIMBA FW',
-      date: step2Date || purchaseDate,
-      subtotal: subtotalAmount,
-      discount: discountAmount,
-      packing: packingAmount,
-      tax: taxAmount,
-      netTotal: grandTotalAmount,
-      transport: transportVal,
-      debit: grandTotalAmount,
-      credit: activeCustomer ? activeCustomer.credit : 0,
-      netBalance: grandTotalAmount - (activeCustomer ? activeCustomer.credit : 0),
-    };
-    setPerformoBills((prev) => [newBill, ...prev]);
-
-    // 3. Add to ledger transactions history
-    const newTxn = {
-      id: `TXN-${Date.now()}`,
-      customerId: activeCustomer ? activeCustomer.id : 'CUST-101',
-      customerName: targetCustomerName,
-      date: step2Date || purchaseDate,
-      companyName: step2Company || 'SIMBA FW',
-      debit: grandTotalAmount,
-      credit: 0.00,
-      balance: (activeCustomer ? activeCustomer.debit : 0) + grandTotalAmount,
-    };
-    setTransactions((prev) => [newTxn, ...prev]);
-
-    setFeedback({
-      type: 'success',
-      message: `✅ Bill #${currentBillNo} Created Successfully!`,
-      details: `${formatCurrency(grandTotalAmount)} billed to ${targetCustomerName} (Company: ${step2Company || 'SIMBA FW'}). Switched to Performo Details.`,
-    });
-
-    // Reset product rows and increment bill number for next bill
-    setProductRows([]);
-    const nextBillNo = (parseInt(currentBillNo, 10) + 1 || 102).toString();
-    setStep2BillNo(nextBillNo);
-
-    // Auto-navigate to Performo Details tab to show created bill
-    setActiveTab('performo');
   };
 
   // Save Performo Order (Step 4 legacy)
@@ -1129,8 +1346,17 @@ const PurchaseEntry = () => {
                     const cust = customersList.find((c) => c.id === id);
                     if (cust) {
                       setStep2Customer(cust.name);
-                      const adv = getCustomerTotalAdvance(cust.id);
-                      setCustomerAdvanceInput(adv ? adv.toString() : '');
+                      const pending = getCustomerPendingAmount
+                        ? getCustomerPendingAmount(cust.id)
+                        : Math.max(0, (cust.debit || 0) - (cust.credit || 0));
+                      const remAdv = getCustomerRemainingAdvance
+                        ? getCustomerRemainingAdvance(cust.id)
+                        : Math.max(0, (cust.credit || 0) - (cust.debit || 0));
+                      if (pending > 0 || remAdv <= 0) {
+                        setCustomerAdvanceInput('0');
+                      } else {
+                        setCustomerAdvanceInput(remAdv.toString());
+                      }
                     }
                     setFeedback(null);
                     setCreditFeedback(null);
@@ -1140,11 +1366,16 @@ const PurchaseEntry = () => {
                   {customersList.length === 0 ? (
                     <option value="">No customers found - Click + Add Customer</option>
                   ) : (
-                    customersList.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} ({c.customId || c.id})
-                      </option>
-                    ))
+                    customersList.map((c) => {
+                      const pAmt = getCustomerPendingAmount
+                        ? getCustomerPendingAmount(c.id)
+                        : Math.max(0, (c.debit || 0) - (c.credit || 0));
+                      return (
+                        <option key={c.id} value={c.id}>
+                          {c.name} ({c.customId || c.id}){pAmt > 0 ? ` [⚠️ Pending: ${formatCurrency(pAmt)}]` : ''}
+                        </option>
+                      );
+                    })
                   )}
                 </select>
               </div>
@@ -1164,53 +1395,141 @@ const PurchaseEntry = () => {
                 />
               </div>
 
-              {/* Live Remaining Advance Display Banner */}
-              <div className="md:col-span-4 bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-3.5 flex items-center justify-between shadow-2xs">
-                <div>
-                  <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">
-                    Customer Remaining Advance
-                  </p>
-                  <p className="text-xl font-black text-emerald-700">
-                    {formatCurrency(remainingAdvance)}
-                  </p>
-                </div>
-                <div className="text-right text-[11px] text-emerald-800 font-medium">
-                  <p>Total Advance: <strong>{formatCurrency(getCustomerTotalAdvance(selectedCustomerId))}</strong></p>
-                </div>
+              {/* Dynamic Status Banner: Pending Due vs New Customer vs Advance */}
+              <div className="md:col-span-4">
+                {currentCustPending > 0 ? (
+                  <div className="bg-gradient-to-br from-rose-50 via-red-50 to-amber-50 border-2 border-rose-300 rounded-xl p-3.5 flex items-center justify-between shadow-xs">
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <AlertTriangle size={15} className="text-rose-600 animate-pulse shrink-0" />
+                        <p className="text-[10px] font-black text-rose-800 uppercase tracking-wider">
+                          Old Customer Pending Amount
+                        </p>
+                      </div>
+                      <p className="text-xl font-black text-rose-600 mt-0.5">
+                        {formatCurrency(currentCustPending)}
+                      </p>
+                      <p className="text-[10px] text-rose-700 font-semibold mt-0.5">
+                        Unpaid dues from previous order(s)
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <span className="inline-block px-2.5 py-1 bg-rose-100 border border-rose-300 text-rose-800 rounded-lg text-[10px] font-extrabold uppercase tracking-wider">
+                        Payment Due
+                      </span>
+                    </div>
+                  </div>
+                ) : isCurrentCustomerNew ? (
+                  <div className="bg-gradient-to-br from-sky-50 to-blue-50 border border-blue-200 rounded-xl p-3.5 flex items-center justify-between shadow-2xs">
+                    <div>
+                      <p className="text-[10px] font-bold text-blue-800 uppercase tracking-wider">
+                        New Customer Account
+                      </p>
+                      <p className="text-xl font-black text-blue-700 mt-0.5">
+                        ₹0.00 Advance
+                      </p>
+                      <p className="text-[10px] text-blue-600 font-semibold mt-0.5">
+                        First order • No previous dues
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <span className="inline-block px-2.5 py-1 bg-blue-100 border border-blue-200 text-blue-800 rounded-lg text-[10px] font-extrabold uppercase tracking-wider">
+                        New Customer
+                      </span>
+                    </div>
+                  </div>
+                ) : currentCustRemainingAdv > 0 ? (
+                  <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl p-3.5 flex items-center justify-between shadow-2xs">
+                    <div>
+                      <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">
+                        Customer Remaining Advance
+                      </p>
+                      <p className="text-xl font-black text-emerald-700 mt-0.5">
+                        {formatCurrency(currentCustRemainingAdv)}
+                      </p>
+                      <p className="text-[10px] text-emerald-700 font-semibold mt-0.5">
+                        Available advance credit
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <span className="inline-block px-2.5 py-1 bg-emerald-100 border border-emerald-300 text-emerald-800 rounded-lg text-[10px] font-extrabold uppercase tracking-wider">
+                        Advance Available
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-gradient-to-br from-slate-50 to-emerald-50 border border-slate-200 rounded-xl p-3.5 flex items-center justify-between shadow-2xs">
+                    <div>
+                      <p className="text-[10px] font-bold text-slate-700 uppercase tracking-wider">
+                        Customer Balance Status
+                      </p>
+                      <p className="text-xl font-black text-emerald-700 mt-0.5">
+                        ₹0.00 Pending
+                      </p>
+                      <p className="text-[10px] text-slate-500 font-semibold mt-0.5">
+                        All previous bills settled
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <span className="inline-block px-2.5 py-1 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg text-[10px] font-bold">
+                        Settled
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Row 2: Customer Advance Amt & No. of Cases Input Fields */}
             <div className="pt-4 border-t border-slate-100 grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
               <div className="md:col-span-6">
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Advance Amount (₹)
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Advance Amount (₹)
+                  </label>
+                  {isCurrentCustomerNew ? (
+                    <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded">
+                      New Customer: ₹0
+                    </span>
+                  ) : currentCustPending > 0 ? (
+                    <span className="text-[10px] font-extrabold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded flex items-center gap-1">
+                      <AlertTriangle size={10} /> Old Pending: {formatCurrency(currentCustPending)}
+                    </span>
+                  ) : null}
+                </div>
                 <input
-                  type="number"
-                  step="0.01"
-                  placeholder="Enter Advance Amount"
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="0"
                   value={customerAdvanceInput}
                   onChange={(e) => {
-                    const val = e.target.value;
+                    const val = e.target.value.replace(/[^0-9.]/g, '');
                     setCustomerAdvanceInput(val);
                   }}
                   className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-emerald-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 shadow-2xs"
                 />
+                <p className="text-[11px] text-slate-500 mt-1">
+                  {isCurrentCustomerNew
+                    ? '✨ New customer advance defaults to ₹0. Enter advance if paid today.'
+                    : currentCustPending > 0
+                    ? `⚠️ Customer has ${formatCurrency(currentCustPending)} pending from earlier orders. Enter new advance received today (if any).`
+                    : currentCustRemainingAdv > 0
+                    ? `ℹ️ Has ${formatCurrency(currentCustRemainingAdv)} advance balance available.`
+                    : 'Enter advance amount for this order (defaults to 0).'}
+                </p>
               </div>
 
               <div className="md:col-span-6">
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
                   <span>Total Ordered Cases</span>
-                  <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">Manual Entry</span>
+                  <span className="text-[10px] font-semibold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">Auto Calculated</span>
                 </label>
                 <input
-                  type="number"
-                  min="0"
-                  placeholder="Enter Total Cases (e.g. 10)"
-                  value={step2CaseCount}
-                  onChange={(e) => setStep2CaseCount(e.target.value)}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 shadow-2xs"
+                  type="text"
+                  readOnly
+                  placeholder="0 Cases"
+                  value={`${totalRequiredCases} Cases`}
+                  className="w-full px-4 py-3 bg-slate-100/90 border border-slate-200 rounded-xl text-sm font-black text-blue-700 focus:outline-none shadow-2xs cursor-not-allowed"
                 />
               </div>
             </div>
@@ -1316,7 +1635,7 @@ const PurchaseEntry = () => {
                           value={reqEntryCases}
                           onChange={(e) => setReqEntryCases(e.target.value)}
                           onKeyDown={(e) => handleReqKeyDown(e, 'cases')}
-                          className="w-full px-3 py-2.5 bg-white border border-slate-300 focus:border-blue-600 rounded-xl font-bold text-center text-blue-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all text-xs shadow-2xs"
+                          className="w-full px-3 py-2.5 bg-white border border-slate-300 focus:border-blue-600 rounded-xl font-bold text-center text-blue-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all text-xs shadow-2xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
                       </td>
                       <td className="py-2.5 px-3 text-center">
@@ -1485,7 +1804,7 @@ const PurchaseEntry = () => {
         </div>
 
         {/* Dynamic Case Count & Advance Amount Reduction Banner */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-gradient-to-r from-blue-50 via-indigo-50 to-slate-50 p-4 rounded-xl border border-blue-200/80 shadow-2xs">
+        <div className={`grid grid-cols-1 ${currentCustPending > 0 ? 'md:grid-cols-4' : 'md:grid-cols-3'} gap-4 bg-gradient-to-r from-blue-50 via-indigo-50 to-slate-50 p-4 rounded-xl border border-blue-200/80 shadow-2xs`}>
           <div>
             <p className="text-[10px] font-bold text-blue-800 uppercase tracking-wider">
               Customer Account
@@ -1498,20 +1817,37 @@ const PurchaseEntry = () => {
             </p>
           </div>
 
+          {currentCustPending > 0 && (
+            <div className="border-l border-rose-200 pl-4 bg-rose-50/70 p-2.5 rounded-lg">
+              <p className="text-[10px] font-extrabold text-rose-800 uppercase tracking-wider flex items-center gap-1">
+                <AlertTriangle size={12} className="text-rose-600" />
+                Old Order Pending Due
+              </p>
+              <div className="flex items-baseline gap-2 mt-0.5">
+                <span className="text-xl font-black text-rose-600">
+                  {formatCurrency(currentCustPending)}
+                </span>
+              </div>
+              <p className="text-[11px] text-rose-700 font-semibold mt-0.5">
+                Added to final bill payable
+              </p>
+            </div>
+          )}
+
           <div className="border-l border-slate-200 pl-4">
             <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">
               Remaining Cases / Allocated Cases
             </p>
             <div className="flex items-baseline gap-2 mt-0.5">
               <span className={`text-xl font-black ${dynamicRemainingCases < 0 ? 'text-rose-600' : 'text-blue-700'}`}>
-                {dynamicRemainingCases} Cases
+                {Math.max(0, dynamicRemainingCases)} Cases
               </span>
               <span className="text-xs font-bold text-slate-400">
-                / {initialCasesAllocated} Total
+                / {initialCasesAllocated} Total Required
               </span>
             </div>
             <p className="text-[11px] text-slate-600 font-semibold mt-0.5">
-              Added in Table: <strong className="text-slate-900">{totalAddedCases} Cases</strong>
+              Case Out / Dispatched: <strong className="text-blue-700">{totalAddedCases} Cases</strong>
             </p>
           </div>
 
@@ -1533,251 +1869,154 @@ const PurchaseEntry = () => {
           </div>
         </div>
 
-        {/* ── Product Entry Row ── */}
-        <form onSubmit={handleAddProductRow} className="space-y-3">
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
-            {/* Particular dropdown */}
-            <div className="md:col-span-4">
-              <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
-                <span>Particular</span>
-                <span className="font-mono text-[11px] font-extrabold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
-                  Item ID: {editingRowIndex !== null ? (productRows[editingRowIndex]?.productId || `${currentCustNum}-${String(editingRowIndex + 1).padStart(2, '0')}`) : `${currentCustNum}-${String(productRows.length + 1).padStart(2, '0')}`}
-                </span>
-              </label>
-              <div className="relative flex items-center">
-                <select
-                  value={entryParticular}
-                  onChange={(e) => setEntryParticular(e.target.value)}
-                  className="w-full pl-3 pr-14 py-2.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 cursor-pointer shadow-2xs appearance-none"
-                >
-                  <option value="">-- Select Product --</option>
-                  {particularOptions.map((opt) => (
-                    <option key={opt} value={opt}>
-                      {opt}
-                    </option>
-                  ))}
-                </select>
-
-                {/* Inner Action Group: Cross Clear Icon + Dropdown Arrow */}
-                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                  {entryParticular && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setEntryParticular('');
-                        setEntryCase('');
-                        setEntryRate('');
-                        setEntryPktUnits('');
-                        setEditingRowIndex(null);
-                      }}
-                      title="Clear"
-                      className="w-5 h-5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-all cursor-pointer shadow-2xs"
-                    >
-                      <X size={12} />
-                    </button>
-                  )}
-                  <ChevronDown
-                    size={14}
-                    className="text-slate-400 pointer-events-none"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Case input */}
-            <div className="md:col-span-2">
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Case
-              </label>
-              <input
-                type="number"
-                min="1"
-                placeholder="Case"
-                value={entryCase}
-                onChange={(e) => setEntryCase(e.target.value)}
-                className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 shadow-2xs"
-              />
-            </div>
-
-            {/* Rate input */}
-            <div className="md:col-span-2">
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Rate
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="Rate"
-                value={entryRate}
-                onChange={(e) => setEntryRate(e.target.value)}
-                className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 shadow-2xs"
-              />
-            </div>
-
-            {/* Pkt / Units input */}
-            <div className="md:col-span-2">
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Pkt / Units
-              </label>
-              <input
-                type="number"
-                min="1"
-                placeholder="Pkt / Units"
-                value={entryPktUnits}
-                onChange={(e) => setEntryPktUnits(e.target.value)}
-                className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 shadow-2xs"
-              />
-            </div>
-
-            {/* Amount field (Read-only / auto-calculated) */}
-            <div className="md:col-span-1">
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Amount
-              </label>
-              <input
-                type="text"
-                readOnly
-                placeholder="Amount"
-                value={calculatedEntryAmount ? calculatedEntryAmount.toFixed(2) : ''}
-                className="w-full px-2.5 py-2.5 bg-slate-100 border border-slate-300 rounded-lg text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:outline-none cursor-not-allowed shadow-2xs"
-              />
-            </div>
-
-            {/* Add button (Blue square button) */}
-            <div className="md:col-span-1 flex justify-end">
-              <button
-                type="submit"
-                title={editingRowIndex !== null ? "Update Product" : "Add Product"}
-                className="w-10 h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center justify-center transition-all shadow-sm cursor-pointer shrink-0"
-              >
-                {editingRowIndex !== null ? <Check size={18} /> : <Plus size={18} />}
-              </button>
-            </div>
-          </div>
-
-          {/* Live Units & Amount Formula Calculation Display */}
-          {(casesVal > 0 || pktUnitsVal > 0 || rateVal > 0) && (
-            <div className="bg-blue-50/90 border border-blue-200 rounded-lg px-3.5 py-2 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs font-semibold text-blue-950">
-              <div className="flex items-center gap-2">
-                <Calculator size={14} className="text-blue-600 shrink-0" />
-                <span>
-                  Total Units = {casesVal || 0} Case × {pktUnitsVal || 0} Pkt/Units ={' '}
-                  <strong className="text-blue-700 bg-white px-2 py-0.5 rounded border border-blue-200 font-bold">
-                    {totalUnitsCalculated} Units
-                  </strong>
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span>
-                  Product Amount = {pktUnitsVal > 0 ? `${totalUnitsCalculated} Units` : `${casesVal} Case`} × ₹{rateVal || 0} ={' '}
-                  <strong className="text-blue-800 bg-white px-2 py-0.5 rounded border border-blue-200 font-bold">
-                    {formatCurrency(calculatedEntryAmount)}
-                  </strong>
-                </span>
-              </div>
-            </div>
-          )}
-        </form>
-
-        {/* ── Product Table ── */}
-        <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead className="bg-slate-100 border-b border-slate-200">
-              <tr>
-                <th className="py-3 px-4 font-bold text-slate-700 uppercase w-28 text-center">
-                  PRODUCT ID
-                </th>
-                <th className="py-3 px-4 font-bold text-slate-700 uppercase">
-                  PARTICULAR
-                </th>
-                <th className="py-3 px-4 font-bold text-slate-700 uppercase">
-                  CASE
-                </th>
-                <th className="py-3 px-4 font-bold text-slate-700 uppercase">
-                  RATE
-                </th>
-                <th className="py-3 px-4 font-bold text-slate-700 uppercase">
-                  PKT / UNITS
-                </th>
-                <th className="py-3 px-4 font-bold text-slate-700 uppercase">
-                  AMOUNT
-                </th>
-                <th className="py-3 px-4 font-bold text-slate-700 uppercase text-center">
-                  ACTION
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200 bg-white">
-              {productRows.map((row, idx) => (
-                <tr
-                  key={idx}
-                  className={`hover:bg-slate-50/80 transition-colors ${
-                    editingRowIndex === idx ? 'bg-blue-50/50' : ''
-                  }`}
-                >
-                  <td className="py-3 px-4 font-mono font-bold text-blue-700 text-xs text-center">
-                    {row.productId || `${currentCustNum}-${String(idx + 1).padStart(2, '0')}`}
-                  </td>
-                  <td className="py-3 px-4 font-bold text-slate-900">
-                    {row.particular}
-                  </td>
-                  <td className="py-3 px-4 font-semibold text-slate-800">
-                    {row.caseCount}
-                  </td>
-                  <td className="py-3 px-4 font-semibold text-slate-800">
-                    ₹{row.rate.toFixed(2)}
-                  </td>
-                  <td className="py-3 px-4 font-semibold text-slate-800">
-                    {row.pktUnits ? (
-                      <span>
-                        {row.pktUnits} Pkt{' '}
-                        <span className="text-blue-600 font-bold bg-blue-50 px-1.5 py-0.5 rounded text-[11px]">
-                          ({row.totalUnits} Units)
-                        </span>
-                      </span>
-                    ) : (
-                      '-'
-                    )}
-                  </td>
-                  <td className="py-3 px-4 font-bold text-slate-900">
-                    {formatCurrency(row.amount)}
-                  </td>
-                  <td className="py-3 px-4 text-center">
-                    <div className="flex items-center justify-center gap-2">
-                      <button
-                        onClick={() => handleEditRow(idx)}
-                        className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-                        title="Edit Row"
-                      >
-                        <Pencil size={15} />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteRow(idx)}
-                        className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                        title="Delete Row"
-                      >
-                        <Trash2 size={15} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-
-              {productRows.length === 0 && (
+        {/* ── Product Table with Inline Editable Inputs ── */}
+        <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs bg-white">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead className="bg-slate-100/90 border-b border-slate-200 text-slate-700 font-bold uppercase tracking-wider text-[11px]">
                 <tr>
-                  <td
-                    colSpan="7"
-                    className="text-center py-8 text-slate-400 font-medium"
-                  >
-                    No products added to table yet. Fill the row above and click + to add.
-                  </td>
+                  <th className="py-3.5 px-3.5 text-center w-28">
+                    PRODUCT ID
+                  </th>
+                  <th className="py-3.5 px-4 min-w-[160px]">
+                    PRODUCT NAME
+                  </th>
+                  <th className="py-3.5 px-4 text-center w-32">
+                    CASE REQUIRED
+                  </th>
+                  <th className="py-3.5 px-4 text-center w-32 text-blue-700">
+                    CASE OUT
+                  </th>
+                  <th className="py-3.5 px-4 text-center w-32 text-amber-700">
+                    REMAINING CASES
+                  </th>
+                  <th className="py-3.5 px-4 text-center w-32">
+                    RATE (₹)
+                  </th>
+                  <th className="py-3.5 px-4 text-center w-28">
+                    PKT / UNITS
+                  </th>
+                  <th className="py-3.5 px-4 text-right w-36">
+                    AMOUNT (₹)
+                  </th>
+                  <th className="py-3.5 px-3 text-center w-20 text-slate-500">
+                    ACTION
+                  </th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-100 bg-white">
+                {productRows.map((row, idx) => {
+                  const cReq = parseFloat(row.caseRequired !== undefined ? row.caseRequired : (row.caseCount || 0)) || 0;
+                  const cOut = parseFloat(row.caseOut) || 0;
+                  const remCases = Math.max(0, cReq - cOut);
+
+                  return (
+                    <tr
+                      key={idx}
+                      className="hover:bg-blue-50/20 transition-colors"
+                    >
+                      <td className="py-3 px-3.5 font-mono font-bold text-blue-700 text-xs text-center">
+                        <span className="px-2 py-0.5 bg-blue-50 text-blue-800 rounded border border-blue-200/60 font-mono text-[11px]">
+                          {row.productId || `${currentCustNum}-${String(idx + 1).padStart(2, '0')}`}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 font-bold text-slate-900 text-xs">
+                        {row.particular || row.productName}
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                          {cReq} Cases
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 text-center">
+                        <input
+                          type="number"
+                          min="0"
+                          max={cReq}
+                          placeholder="0"
+                          value={row.caseOut !== undefined ? row.caseOut : '0'}
+                          onChange={(e) => handleRowFieldChange(idx, 'caseOut', e.target.value)}
+                          className="w-24 px-2.5 py-1.5 text-center font-bold text-xs text-blue-700 bg-blue-50/40 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all shadow-2xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <span
+                          className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold ${
+                            remCases === 0
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : 'bg-amber-50 text-amber-700 border border-amber-200'
+                          }`}
+                        >
+                          {remCases} Cases
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 text-center">
+                        <div className="relative inline-block w-28">
+                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">₹</span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="0.00"
+                            value={row.rate !== undefined ? row.rate : '0.00'}
+                            onChange={(e) => handleRowFieldChange(idx, 'rate', e.target.value)}
+                            className="w-full pl-6 pr-2 py-1.5 text-center font-bold text-xs text-slate-900 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-2xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          />
+                        </div>
+                      </td>
+                      <td className="py-2.5 px-3 text-center">
+                        <input
+                          type="number"
+                          min="1"
+                          placeholder="1"
+                          value={row.pktUnits !== undefined ? row.pktUnits : '1'}
+                          onChange={(e) => handleRowFieldChange(idx, 'pktUnits', e.target.value)}
+                          className="w-20 px-2.5 py-1.5 text-center font-bold text-xs text-slate-800 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-2xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                      </td>
+                      <td className="py-3 px-4 font-black text-slate-900 text-xs text-right whitespace-nowrap">
+                        {formatCurrency(row.amount)}
+                      </td>
+                      <td className="py-3 px-3 text-center">
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteRow(idx)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                          title="Delete Product"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+
+                {productRows.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan="9"
+                      className="text-center py-10 px-4 text-slate-500 bg-slate-50/50"
+                    >
+                      <div className="max-w-md mx-auto space-y-3">
+                        <Package size={32} className="mx-auto text-slate-400" />
+                        <p className="font-bold text-slate-700 text-sm">No products in billing table</p>
+                        <p className="text-xs text-slate-500">
+                          Products added in <strong>Product Required</strong> under the <em>Select Customer Account</em> tab will automatically appear here with their required cases.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('customer')}
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                        >
+                          Go to Select Customer Account
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {/* ── Customer & Billing Controls Grid ── */}
@@ -1810,17 +2049,19 @@ const PurchaseEntry = () => {
                 </div>
               </div>
 
-              {/* Case Count */}
+              {/* Bill No * */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
-                  <span>Case Count</span>
-                  <span className="text-[10px] font-semibold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">Ordered Total</span>
+                  <span>Bill No <span className="text-rose-500">*</span></span>
+                  <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">Manual Entry</span>
                 </label>
                 <input
-                  type="number"
-                  readOnly
-                  value={totalAddedCases}
-                  className="w-full px-3 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-black text-blue-700 focus:outline-none shadow-2xs cursor-not-allowed"
+                  type="text"
+                  required
+                  placeholder="Enter Bill No"
+                  value={step2BillNo}
+                  onChange={(e) => setStep2BillNo(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900 font-mono placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 shadow-2xs"
                 />
               </div>
 
@@ -1848,6 +2089,20 @@ const PurchaseEntry = () => {
                 </div>
               </div>
 
+              {/* Case Count */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                  <span>Case Count</span>
+                  <span className="text-[10px] font-semibold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">Ordered Total</span>
+                </label>
+                <input
+                  type="number"
+                  readOnly
+                  value={totalAddedCases}
+                  className="w-full px-3 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-black text-blue-700 focus:outline-none shadow-2xs cursor-not-allowed"
+                />
+              </div>
+
               {/* Discount (%) */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -1859,22 +2114,7 @@ const PurchaseEntry = () => {
                   placeholder="Discount %"
                   value={step2Discount}
                   onChange={(e) => setStep2Discount(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 shadow-2xs"
-                />
-              </div>
-
-              {/* Transport */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Transport
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  placeholder="Transport charges"
-                  value={step2Transport}
-                  onChange={(e) => setStep2Transport(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 shadow-2xs"
+                  className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 shadow-2xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
               </div>
 
@@ -1889,38 +2129,28 @@ const PurchaseEntry = () => {
                   placeholder="Packing %"
                   value={step2Packing}
                   onChange={(e) => setStep2Packing(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 shadow-2xs"
+                  className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 shadow-2xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
               </div>
 
-              {/* Bill No * */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Bill No <span className="text-rose-500">*</span>
+              {/* Tax Amount (₹) - Direct Manual Amount Input (Transport Removed) */}
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                  <span>Tax Amount (₹)</span>
+                  <span className="text-[10px] font-semibold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">Manual Rupee Amount</span>
                 </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Enter Bill No (e.g. 101)"
-                  value={step2BillNo}
-                  onChange={(e) => setStep2BillNo(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 shadow-2xs"
-                />
-              </div>
-
-              {/* Tax */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Tax (%)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  placeholder="Tax %"
-                  value={step2Tax}
-                  onChange={(e) => setStep2Tax(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 shadow-2xs"
-                />
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">₹</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="Enter Tax Amount (₹)"
+                    value={step2Tax}
+                    onChange={(e) => setStep2Tax(e.target.value)}
+                    className="w-full pl-7 pr-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 shadow-2xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                </div>
               </div>
             </div>
 
@@ -1997,18 +2227,67 @@ const PurchaseEntry = () => {
                 </div>
                 
                 <div className="flex justify-between text-slate-600 font-medium">
-                  <span>Transport Charges:</span>
-                  <span className="font-bold text-slate-800">+ {formatCurrency(transportVal)}</span>
-                </div>
-                
-                <div className="flex justify-between text-slate-600 font-medium">
-                  <span>Tax ({taxVal}%):</span>
+                  <span>Tax Amount:</span>
                   <span className="font-bold text-slate-800">+ {formatCurrency(taxAmount)}</span>
                 </div>
 
                 <div className="flex justify-between text-sm font-bold text-slate-900 border-t border-slate-200 pt-2">
-                  <span>Net Payable Total:</span>
+                  <span>Current Bill Net Total:</span>
                   <span className="text-blue-600 font-black">{formatCurrency(grandTotalAmount)}</span>
+                </div>
+
+                {currentCustPending > 0 && (
+                  <div className="flex justify-between text-xs font-bold text-rose-700 bg-rose-50/90 p-2.5 rounded-xl border border-rose-200">
+                    <span className="flex items-center gap-1.5">
+                      <AlertTriangle size={13} className="text-rose-600 shrink-0" />
+                      Previous Order Pending:
+                    </span>
+                    <span className="font-black">+ {formatCurrency(currentCustPending)}</span>
+                  </div>
+                )}
+
+                {currentCustPending > 0 && (
+                  <div className="flex justify-between text-sm font-extrabold text-slate-900 bg-slate-100 p-2.5 rounded-xl border border-slate-200">
+                    <span>Total Overall Payable:</span>
+                    <span className="text-slate-900 font-black">{formatCurrency(totalPayableWithPending)}</span>
+                  </div>
+                )}
+
+                {/* Advance Amount & Balance Amount Box */}
+                <div className="border-t-2 border-dashed border-slate-200 pt-3 space-y-2">
+                  <div className="flex justify-between text-xs font-bold text-slate-700">
+                    <span>Customer Advance Amt:</span>
+                    <span className="text-emerald-700 font-extrabold">{formatCurrency(initialAdvanceAmt)}</span>
+                  </div>
+
+                  <div className="flex justify-between text-xs font-bold text-slate-700">
+                    <span>Total Bill Amount:</span>
+                    <span className="text-slate-900 font-extrabold">
+                      {formatCurrency(currentCustPending > 0 ? totalPayableWithPending : grandTotalAmount)}
+                    </span>
+                  </div>
+
+                  <div className={`p-3 rounded-xl border mt-2 transition-all ${
+                    balanceAmount >= 0
+                      ? 'bg-emerald-50 border-emerald-200 text-emerald-950'
+                      : 'bg-rose-50 border-rose-200 text-rose-950'
+                  }`}>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                          Balance Amount
+                        </p>
+                        <p className="text-[10px] text-slate-500 font-semibold">
+                          Advance ({formatCurrency(initialAdvanceAmt)}) - Total ({formatCurrency(currentCustPending > 0 ? totalPayableWithPending : grandTotalAmount)})
+                        </p>
+                      </div>
+                      <span className={`text-base font-black ${
+                        balanceAmount >= 0 ? 'text-emerald-700' : 'text-rose-600'
+                      }`}>
+                        {formatCurrency(balanceAmount)}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -2562,13 +2841,18 @@ const PurchaseEntry = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-              Opening / Advance Amount (₹)
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Opening / Advance Amount (₹)
+              </label>
+              <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
+                Default: ₹0 for new customer
+              </span>
+            </div>
             <input
               type="number"
               step="0.01"
-              placeholder="e.g. 50000"
+              placeholder="0"
               value={newCustomerForm.advanceAmount}
               onChange={(e) =>
                 setNewCustomerForm({ ...newCustomerForm, advanceAmount: e.target.value })
