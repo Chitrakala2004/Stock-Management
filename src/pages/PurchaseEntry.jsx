@@ -380,12 +380,9 @@ const PurchaseEntry = () => {
           const amountNum = rNum * cOutNum * uNum;
           const remCases = Math.max(0, caseReq - cOutNum);
           const defaultCompany =
-            existing?.companyName ||
-            existing?.brand ||
             item.companyName ||
-            (typeof prodMatch?.brand === 'string' ? prodMatch.brand : prodMatch?.brand?.name) ||
-            step2Company ||
-            'SIMBA FW';
+            (existing?.isManualCompany ? existing.companyName : '') ||
+            '';
 
           return {
             requiredId: item.id,
@@ -394,6 +391,7 @@ const PurchaseEntry = () => {
             productName: item.productName,
             companyName: defaultCompany,
             brand: defaultCompany,
+            isManualCompany: Boolean(existing?.isManualCompany),
             caseRequired: caseReq,
             caseOut: caseOutVal,
             remainingCases: remCases,
@@ -584,7 +582,8 @@ const PurchaseEntry = () => {
         return {
           productId: `${currentCustNum}-${String(idx + 1).padStart(2, '0')}`,
           particular: item.productName,
-          companyName: item.companyName || step2Company,
+          companyName: item.companyName || '',
+          brand: item.companyName || '',
           caseCount: caseNum,
           rate: rateNum,
           pktUnits: pktUnitsNum,
@@ -953,6 +952,7 @@ const PurchaseEntry = () => {
       row[field] = finalValue;
       if (field === 'companyName') {
         row.brand = finalValue;
+        row.isManualCompany = Boolean(finalValue);
       }
 
       const caseOutVal = parseFloat(field === 'caseOut' ? finalValue : row.caseOut) || 0;
@@ -1048,8 +1048,8 @@ const PurchaseEntry = () => {
         productId: row.productId,
         particular: row.particular || row.productName,
         productName: row.particular || row.productName,
-        brand: row.companyName || row.brand || step2Company || 'SIMBA FW',
-        companyName: row.companyName || row.brand || step2Company || 'SIMBA FW',
+        brand: row.companyName || row.brand || '',
+        companyName: row.companyName || row.brand || '',
         caseRequired: parseFloat(row.caseRequired) || 0,
         caseOut: parseFloat(row.caseOut) || 0,
         caseCount: parseFloat(row.caseOut) || 0,
@@ -1946,10 +1946,11 @@ const PurchaseEntry = () => {
                             </span>
                             <div className="relative inline-block w-full max-w-[170px]">
                               <select
-                                value={row.companyName || row.brand || step2Company || 'SIMBA FW'}
+                                value={row.companyName || ''}
                                 onChange={(e) => handleRowFieldChange(idx, 'companyName', e.target.value)}
                                 className="w-full text-[11px] font-semibold bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:border-blue-500 rounded-md pl-2 pr-6 py-1 text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all cursor-pointer shadow-2xs appearance-none truncate"
                               >
+                                <option value="">Select Company</option>
                                 {allCompanyOptions.map((comp) => (
                                   <option key={comp} value={comp}>
                                     {comp}
