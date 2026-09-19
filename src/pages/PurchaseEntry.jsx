@@ -56,6 +56,14 @@ const companyOptions = [
   'SRI KALISWARI FIREWORKS',
 ];
 
+const getTodayDateString = () => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const PurchaseEntry = () => {
   const stockContext = useStock();
   const {
@@ -202,7 +210,7 @@ const PurchaseEntry = () => {
     }
     setActiveTab('account');
   };
-  const [purchaseDate, setPurchaseDate] = useState('2026-09-17');
+  const [purchaseDate, setPurchaseDate] = useState(getTodayDateString());
   const [customerAdvanceInput, setCustomerAdvanceInput] = useState('');
 
   // Auto-sync customer name & advance input when selectedCustomerId or customersList changes
@@ -319,7 +327,7 @@ const PurchaseEntry = () => {
 
   const [step2BillNo, setStep2BillNo] = useState('101001');
   const [step2Tax, setStep2Tax] = useState('');
-  const [step2Date, setStep2Date] = useState('2026-09-17');
+  const [step2Date, setStep2Date] = useState(getTodayDateString());
 
   // Prevent mouse wheel from incrementing/decrementing any number inputs across page
   useEffect(() => {
@@ -361,7 +369,9 @@ const PurchaseEntry = () => {
           // Initial rate starts empty with placeholder '0' and stock out (caseOut) starts at '0'
           const caseOutVal = existing && existing.caseOut !== undefined ? existing.caseOut : '0';
           const rateVal = existing && existing.rate !== undefined && existing.rate !== '' ? existing.rate : '';
-          const pktUnitsVal = existing && existing.pktUnits !== undefined ? existing.pktUnits : (prodMatch?.piecesPerCase || prodMatch?.caseQuantity || 1);
+          const pktUnitsVal = existing && existing.pktUnits !== undefined && existing.pktUnits !== '' && existing.pktUnits !== 1 && existing.pktUnits !== '1'
+            ? existing.pktUnits
+            : '';
 
           const cOutNum = parseFloat(caseOutVal) || 0;
           const rNum = parseFloat(rateVal) || 0;
@@ -566,9 +576,9 @@ const PurchaseEntry = () => {
         );
         const caseNum = parseFloat(item.cases) || 1;
         const rateNum = prodMatch?.customerRate || prodMatch?.rate || 0;
-        const pktUnitsNum = prodMatch?.caseQuantity || 0;
-        const totalUnitsNum = caseNum * (pktUnitsNum > 0 ? pktUnitsNum : 1);
-        const amountNum = (pktUnitsNum > 0 ? totalUnitsNum : caseNum) * rateNum;
+        const pktUnitsNum = item.pktUnits && item.pktUnits !== '1' && item.pktUnits !== 1 ? item.pktUnits : '';
+        const totalUnitsNum = caseNum * (parseFloat(pktUnitsNum) || 1);
+        const amountNum = totalUnitsNum * rateNum;
 
         return {
           productId: `${currentCustNum}-${String(idx + 1).padStart(2, '0')}`,
@@ -731,7 +741,7 @@ const PurchaseEntry = () => {
     amount: '',
     paymentMethod: 'UPI',
     ref: '',
-    date: '2026-09-17',
+    date: getTodayDateString(),
     desc: '',
   });
 
@@ -744,7 +754,7 @@ const PurchaseEntry = () => {
     setStep2BillNo(bill.billNo || '');
     setStep2Customer(bill.customer || '');
     setStep2Company(bill.companyName || 'SIMBA FW');
-    setStep2Date(bill.date || '2026-09-17');
+    setStep2Date(bill.date || getTodayDateString());
     setStep2Discount(bill.discount ? bill.discount.toString() : '');
     setStep2Transport(bill.transport ? bill.transport.toString() : '');
     setStep2Packing(bill.packing ? bill.packing.toString() : '');
@@ -768,7 +778,7 @@ const PurchaseEntry = () => {
       amount: crd.creditAmt ? crd.creditAmt.toString() : '',
       paymentMethod: crd.paymentMethod || 'UPI',
       ref: crd.paymentRefId || '',
-      date: crd.date || '2026-09-17',
+      date: crd.date || getTodayDateString(),
       desc: '',
     });
     setActiveTab('credit');
@@ -781,7 +791,7 @@ const PurchaseEntry = () => {
   const handleEditTransaction = (trx) => {
     if (!trx) return;
     setStep2Company(trx.companyName || 'SIMBA FW');
-    setStep2Date(trx.date || '2026-09-17');
+    setStep2Date(trx.date || getTodayDateString());
     setActiveTab('product');
     setFeedback({
       type: 'success',
@@ -1057,8 +1067,8 @@ const PurchaseEntry = () => {
         customer: targetCustomerName,
         customerName: targetCustomerName,
         customerId: activeCustomer ? activeCustomer.id : 'CUST-101',
-        companyName: step2Company || 'SIMBA FW',
-        date: step2Date || purchaseDate,
+        companyName: productRows[0]?.companyName || productRows[0]?.brand || step2Company || 'SIMBA FW',
+        date: step2Date || purchaseDate || getTodayDateString(),
         subtotal: subtotalAmount,
         discount: discountAmount,
         packing: packingAmount,
@@ -1086,7 +1096,7 @@ const PurchaseEntry = () => {
           customerId: activeCustomer ? activeCustomer.id : 'CUST-101',
           customerName: targetCustomerName,
           customerPhone: activeCustomer?.phone || '',
-          date: step2Date || purchaseDate,
+          date: step2Date || purchaseDate || getTodayDateString(),
           items: billItems,
           subtotal: subtotalAmount,
           discount: discountAmount,
@@ -1106,7 +1116,7 @@ const PurchaseEntry = () => {
           customerId: activeCustomer?.id || 'CUST-101',
           customerName: targetCustomerName,
           amount: newlyEnteredAdvance,
-          date: step2Date || purchaseDate,
+          date: step2Date || purchaseDate || getTodayDateString(),
           paymentReference: `ADV-${currentBillNo}`,
           paymentMethod: 'Cash',
         });
@@ -1117,8 +1127,8 @@ const PurchaseEntry = () => {
         id: `TXN-${Date.now()}`,
         customerId: activeCustomer ? activeCustomer.id : 'CUST-101',
         customerName: targetCustomerName,
-        date: step2Date || purchaseDate,
-        companyName: step2Company || 'SIMBA FW',
+        date: step2Date || purchaseDate || getTodayDateString(),
+        companyName: productRows[0]?.companyName || productRows[0]?.brand || step2Company || 'SIMBA FW',
         debit: grandTotalAmount,
         credit: newlyEnteredAdvance,
         balance: (activeCustomer ? activeCustomer.debit : 0) + grandTotalAmount - newlyEnteredAdvance,
@@ -1193,7 +1203,7 @@ const PurchaseEntry = () => {
       creditAmt: amt,
       paymentMethod: creditForm.paymentMethod || 'UPI',
       paymentRefId: creditForm.ref || `PAY-${Math.floor(1000 + Math.random() * 9000)}`,
-      date: creditForm.date || '2026-09-17',
+      date: creditForm.date || getTodayDateString(),
     };
     setCreditEntries((prev) => [newCreditEntry, ...prev]);
 
@@ -1201,7 +1211,7 @@ const PurchaseEntry = () => {
       addAdvancePayment({
         customerId: targetCustomer.id,
         amount: amt,
-        date: creditForm.date || '2026-09-17',
+        date: creditForm.date || getTodayDateString(),
         paymentReference: creditForm.ref || `PAY-${Math.floor(1000 + Math.random() * 9000)}`,
         paymentMethod: creditForm.paymentMethod,
       });
@@ -1227,7 +1237,7 @@ const PurchaseEntry = () => {
       amount: '',
       paymentMethod: 'UPI',
       ref: '',
-      date: '2026-09-17',
+      date: getTodayDateString(),
       desc: '',
     });
   };
@@ -1985,7 +1995,7 @@ const PurchaseEntry = () => {
                             type="number"
                             min="1"
                             placeholder="1"
-                            value={row.pktUnits !== undefined ? row.pktUnits : '1'}
+                            value={row.pktUnits && row.pktUnits !== '1' && row.pktUnits !== 1 && row.pktUnits !== '0' && row.pktUnits !== 0 ? row.pktUnits : ''}
                             onChange={(e) => handleRowFieldChange(idx, 'pktUnits', e.target.value)}
                             className="w-20 px-2.5 py-1.5 text-center font-bold text-xs text-slate-800 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-2xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           />
@@ -2039,6 +2049,7 @@ const PurchaseEntry = () => {
           <div className="grid grid-cols-1 md:grid-cols-12 gap-5 pt-2">
             {/* Left Form Inputs (8 cols) */}
             <div className="md:col-span-8 space-y-4">
+              {/* Row 1: Customer & Bill No * (2 columns) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Customer */}
                 <div>
@@ -2080,31 +2091,10 @@ const PurchaseEntry = () => {
                     className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900 font-mono placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 shadow-2xs"
                   />
                 </div>
+              </div>
 
-                {/* Company */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Company
-                  </label>
-                  <div className="relative">
-                    <select
-                      value={step2Company}
-                      onChange={(e) => setStep2Company(e.target.value)}
-                      className="w-full pl-3 pr-8 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 cursor-pointer shadow-2xs appearance-none"
-                    >
-                      {allCompanyOptions.map((comp) => (
-                        <option key={comp} value={comp}>
-                          {comp}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown
-                      size={14}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
-                    />
-                  </div>
-                </div>
-
+              {/* Row 2: Case Count + Discount (%) + Packing (%) (3 columns) */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {/* Case Count */}
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
@@ -2148,25 +2138,25 @@ const PurchaseEntry = () => {
                     className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 shadow-2xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                 </div>
+              </div>
 
-                {/* Tax Amount (₹) - Direct Manual Amount Input (Transport Removed) */}
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
-                    <span>Tax Amount (₹)</span>
-                    <span className="text-[10px] font-semibold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">Manual Rupee Amount</span>
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">₹</span>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      placeholder="Enter Tax Amount (₹)"
-                      value={step2Tax}
-                      onChange={(e) => setStep2Tax(e.target.value)}
-                      className="w-full pl-7 pr-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 shadow-2xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                    />
-                  </div>
+              {/* Row 3: Tax Amount (₹) - Direct Manual Amount Input */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+                  <span>Tax Amount (₹)</span>
+                  <span className="text-[10px] font-semibold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">Manual Rupee Amount</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">₹</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="Enter Tax Amount (₹)"
+                    value={step2Tax}
+                    onChange={(e) => setStep2Tax(e.target.value)}
+                    className="w-full pl-7 pr-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 shadow-2xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
                 </div>
               </div>
 
@@ -2178,7 +2168,8 @@ const PurchaseEntry = () => {
                     type="date"
                     value={step2Date}
                     onChange={(e) => setStep2Date(e.target.value)}
-                    className="w-full pl-10 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 shadow-2xs"
+                    onClick={(e) => e.target.showPicker && e.target.showPicker()}
+                    className="w-full pl-10 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 shadow-2xs cursor-pointer"
                   />
                   <Calendar
                     size={16}
