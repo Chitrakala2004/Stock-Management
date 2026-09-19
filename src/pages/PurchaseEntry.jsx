@@ -368,13 +368,21 @@ const PurchaseEntry = () => {
           const uNum = parseFloat(pktUnitsVal) || 1;
           const amountNum = rNum * cOutNum * uNum;
           const remCases = Math.max(0, caseReq - cOutNum);
+          const defaultCompany =
+            existing?.companyName ||
+            existing?.brand ||
+            item.companyName ||
+            (typeof prodMatch?.brand === 'string' ? prodMatch.brand : prodMatch?.brand?.name) ||
+            step2Company ||
+            'SIMBA FW';
 
           return {
             requiredId: item.id,
             productId: existing?.productId || `${currentCustNum}-${String(idx + 1).padStart(2, '0')}`,
             particular: item.productName,
             productName: item.productName,
-            companyName: item.companyName || existing?.companyName || step2Company,
+            companyName: defaultCompany,
+            brand: defaultCompany,
             caseRequired: caseReq,
             caseOut: caseOutVal,
             remainingCases: remCases,
@@ -932,6 +940,9 @@ const PurchaseEntry = () => {
       }
 
       row[field] = finalValue;
+      if (field === 'companyName') {
+        row.brand = finalValue;
+      }
 
       const caseOutVal = parseFloat(field === 'caseOut' ? finalValue : row.caseOut) || 0;
       const rateVal = parseFloat(field === 'rate' ? finalValue : row.rate) || 0;
@@ -1026,7 +1037,8 @@ const PurchaseEntry = () => {
         productId: row.productId,
         particular: row.particular || row.productName,
         productName: row.particular || row.productName,
-        brand: step2Company || 'SIMBA FW',
+        brand: row.companyName || row.brand || step2Company || 'SIMBA FW',
+        companyName: row.companyName || row.brand || step2Company || 'SIMBA FW',
         caseRequired: parseFloat(row.caseRequired) || 0,
         caseOut: parseFloat(row.caseOut) || 0,
         caseCount: parseFloat(row.caseOut) || 0,
@@ -1858,7 +1870,7 @@ const PurchaseEntry = () => {
                     <th className="py-3.5 px-3.5 text-center w-28">
                       PRODUCT ID
                     </th>
-                    <th className="py-3.5 px-4 min-w-[160px]">
+                    <th className="py-3.5 px-4 min-w-[200px]">
                       PRODUCT NAME
                     </th>
                     <th className="py-3.5 px-4 text-center w-32">
@@ -1867,8 +1879,8 @@ const PurchaseEntry = () => {
                     <th className="py-3.5 px-4 text-center w-32 text-blue-700">
                       CASE OUT
                     </th>
-                    <th className="py-3.5 px-4 text-center w-32 text-amber-700">
-                      REMAINING CASES
+                    <th className="py-3.5 px-2 text-center w-20 text-amber-700 text-[10px] font-extrabold uppercase tracking-wider whitespace-nowrap">
+                      REM. CASES
                     </th>
                     <th className="py-3.5 px-4 text-center w-32">
                       RATE (₹)
@@ -1900,8 +1912,32 @@ const PurchaseEntry = () => {
                             {row.productId || `${currentCustNum}-${String(idx + 1).padStart(2, '0')}`}
                           </span>
                         </td>
-                        <td className="py-3 px-4 font-bold text-slate-900 text-xs">
-                          {row.particular || row.productName}
+                        <td className="py-2.5 px-4 min-w-[200px]">
+                          <div className="font-bold text-slate-900 text-xs leading-snug">
+                            {row.particular || row.productName}
+                          </div>
+                          <div className="mt-1.5 flex items-center gap-1.5">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0">
+                              Co:
+                            </span>
+                            <div className="relative inline-block w-full max-w-[170px]">
+                              <select
+                                value={row.companyName || row.brand || step2Company || 'SIMBA FW'}
+                                onChange={(e) => handleRowFieldChange(idx, 'companyName', e.target.value)}
+                                className="w-full text-[11px] font-semibold bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:border-blue-500 rounded-md pl-2 pr-6 py-1 text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-all cursor-pointer shadow-2xs appearance-none truncate"
+                              >
+                                {allCompanyOptions.map((comp) => (
+                                  <option key={comp} value={comp}>
+                                    {comp}
+                                  </option>
+                                ))}
+                              </select>
+                              <ChevronDown
+                                size={12}
+                                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                              />
+                            </div>
+                          </div>
                         </td>
                         <td className="py-3 px-4 text-center">
                           <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200">
@@ -1919,14 +1955,15 @@ const PurchaseEntry = () => {
                             className="w-24 px-2.5 py-1.5 text-center font-bold text-xs text-blue-700 bg-blue-50/40 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all shadow-2xs [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           />
                         </td>
-                        <td className="py-3 px-4 text-center">
+                        <td className="py-2.5 px-2 text-center whitespace-nowrap">
                           <span
-                            className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold ${remCases === 0
+                            title={`${remCases} Cases Remaining`}
+                            className={`inline-flex items-center justify-center px-2 py-0.5 rounded text-[11px] font-bold ${remCases === 0
                               ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                               : 'bg-amber-50 text-amber-700 border border-amber-200'
                               }`}
                           >
-                            {remCases} Cases
+                            {remCases}
                           </span>
                         </td>
                         <td className="py-2.5 px-3 text-center">
@@ -2055,7 +2092,7 @@ const PurchaseEntry = () => {
                       onChange={(e) => setStep2Company(e.target.value)}
                       className="w-full pl-3 pr-8 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 cursor-pointer shadow-2xs appearance-none"
                     >
-                      {companyOptions.map((comp) => (
+                      {allCompanyOptions.map((comp) => (
                         <option key={comp} value={comp}>
                           {comp}
                         </option>
