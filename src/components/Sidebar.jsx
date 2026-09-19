@@ -4,7 +4,6 @@ import {
   Package,
   ShoppingCart,
   History,
-  Truck,
 } from 'lucide-react';
 
 const navItems = [
@@ -12,7 +11,6 @@ const navItems = [
   { name: 'Company', label: 'Company', icon: Building2 },
   { name: 'Product', label: 'Product', icon: Package },
   { name: 'Performo', label: 'Performo', icon: ShoppingCart },
-  { name: 'Dispatch', label: 'Dispatch', icon: Truck },
   { name: 'All Performo', label: 'All Performo', icon: History },
 ];
 
@@ -44,8 +42,6 @@ const Sidebar = ({ activePage, setActivePage }) => {
             (activePage === 'Products' && item.name === 'Product') ||
             (activePage === 'Stock Management' && item.name === 'Product') ||
             (activePage === 'Purchase Entry' && item.name === 'Performo') ||
-            (activePage === 'Customer Dispatch' && item.name === 'Dispatch') ||
-            (activePage === 'Dispatch Management' && item.name === 'Dispatch') ||
             (activePage === 'Purchase History' && item.name === 'All Performo') ||
             (activePage === 'Transactions' && item.name === 'All Performo');
 

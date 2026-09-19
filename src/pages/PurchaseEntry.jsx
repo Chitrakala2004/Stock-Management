@@ -139,6 +139,7 @@ const PurchaseEntry = () => {
         contextTransactions.map((t) => ({
           ...t,
           id: t.id || t._id,
+          balance: Math.abs(t.balance || 0),
         }))
       );
     }
@@ -1109,7 +1110,7 @@ const PurchaseEntry = () => {
         companyName: step2Company || 'SIMBA FW',
         debit: grandTotalAmount,
         credit: newlyEnteredAdvance,
-        balance: (activeCustomer ? activeCustomer.debit : 0) + grandTotalAmount - newlyEnteredAdvance,
+        balance: Math.abs(closingBalanceAmount),
       };
       setTransactions((prev) => [newTxn, ...prev]);
 
@@ -1184,6 +1185,19 @@ const PurchaseEntry = () => {
       date: creditForm.date || '2026-09-17',
     };
     setCreditEntries((prev) => [newCreditEntry, ...prev]);
+
+    // Also record in Account Details ledger transactions
+    const newCreditTxn = {
+      id: `TXN-CRD-${Date.now()}`,
+      customerId: targetCustomer?.id || 'CUST-101',
+      customerName: creditForm.customerName || (targetCustomer ? targetCustomer.name : 'Customer'),
+      date: creditForm.date || '2026-09-17',
+      companyName: creditForm.companyName || 'SIMBA FW',
+      debit: 0,
+      credit: amt,
+      balance: Math.abs(((targetCustomer?.credit || 0) + amt) - (targetCustomer?.debit || 0)),
+    };
+    setTransactions((prev) => [newCreditTxn, ...prev]);
 
     if (addAdvancePayment && targetCustomer) {
       addAdvancePayment({
@@ -2318,7 +2332,7 @@ const PurchaseEntry = () => {
                       {trx.credit > 0 ? formatCurrency(trx.credit) : '-'}
                     </td>
                     <td className="py-3.5 px-4 font-bold text-slate-900">
-                      {formatCurrency(trx.balance)}
+                      {formatCurrency(Math.abs(trx.balance || 0))}
                     </td>
                     <td className="py-3.5 px-4 text-center">
                       <div className="flex items-center justify-center gap-2">
@@ -2383,7 +2397,6 @@ const PurchaseEntry = () => {
                   <th className="py-3 px-4 font-bold text-slate-700 uppercase whitespace-nowrap">PACKING</th>
                   <th className="py-3 px-4 font-bold text-slate-700 uppercase whitespace-nowrap">TAX</th>
                   <th className="py-3 px-4 font-bold text-slate-700 uppercase whitespace-nowrap">NET TOTAL</th>
-                  <th className="py-3 px-4 font-bold text-slate-700 uppercase whitespace-nowrap">TRANSPORT</th>
                   <th className="py-3 px-4 font-bold text-slate-700 uppercase text-center whitespace-nowrap">ACTION</th>
                 </tr>
               </thead>
@@ -2417,9 +2430,6 @@ const PurchaseEntry = () => {
                     <td className="py-3.5 px-4 font-extrabold text-blue-700 whitespace-nowrap">
                       {formatCurrency(bill.netTotal || bill.debit || 0)}
                     </td>
-                    <td className="py-3.5 px-4 font-semibold text-slate-700 whitespace-nowrap">
-                      {bill.transport > 0 ? formatCurrency(bill.transport) : '-'}
-                    </td>
                     <td className="py-3.5 px-4 text-center whitespace-nowrap">
                       <div className="flex items-center justify-center gap-2">
                         <button
@@ -2451,7 +2461,7 @@ const PurchaseEntry = () => {
 
                 {customerPerformoBills.length === 0 && (
                   <tr>
-                    <td colSpan="11" className="text-center py-8 text-slate-400 font-medium">
+                    <td colSpan="10" className="text-center py-8 text-slate-400 font-medium">
                       No Performo bills found for {activeCustomer ? activeCustomer.name : 'this customer'}.
                     </td>
                   </tr>
