@@ -23,6 +23,7 @@ app.use('/api/purchases', require('./routes/purchaseRoutes'));
 app.use('/api/advances', require('./routes/advanceRoutes'));
 app.use('/api/transactions', require('./routes/stockTransactionRoutes'));
 app.use('/api/stocks', require('./routes/stockRoutes'));
+app.use('/api/dispatches', require('./routes/dispatchRoutes'));
 
 // Health check
 app.get('/', (req, res) => {

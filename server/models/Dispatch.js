@@ -1,43 +1,41 @@
 const mongoose = require('mongoose');
 
-const purchaseItemSchema = new mongoose.Schema({
+const dispatchItemSchema = new mongoose.Schema({
   productId: { type: String },
   particular: { type: String },
   productName: { type: String },
   brand: { type: String },
   caseRequired: { type: Number, default: 0 },
   caseOut: { type: Number, default: 0 },
-  caseCount: { type: Number, default: 0 },
   rate: { type: Number, default: 0 },
   pktUnits: { type: Number, default: 1 },
   totalUnits: { type: Number, default: 0 },
   amount: { type: Number, default: 0 },
   pendingCases: { type: Number, default: 0 },
-  dispatchedCases: { type: Number, default: 0 },
-  rateMode: { type: String, default: 'case' },
 });
 
-const purchaseSchema = new mongoose.Schema(
+const dispatchSchema = new mongoose.Schema(
   {
-    purchaseId: {
+    dispatchId: {
       type: String,
+      required: true,
     },
-    billNo: {
-      type: String,
-    },
-    customer: {
+    customerId: {
       type: String,
     },
     customerName: {
       type: String,
+      required: true,
     },
-    companyName: {
+    customerPhone: {
       type: String,
-      default: 'SIMBA FW',
+      default: '',
     },
     date: {
       type: String,
+      required: true,
     },
+    items: [dispatchItemSchema],
     subtotal: {
       type: Number,
       default: 0,
@@ -54,35 +52,26 @@ const purchaseSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
-    netTotal: {
+    totalAmount: {
       type: Number,
       default: 0,
     },
-    transport: {
+    advanceAmount: {
       type: Number,
       default: 0,
     },
-    debit: {
-      type: Number,
-      default: 0,
-    },
-    credit: {
-      type: Number,
-      default: 0,
-    },
-    netBalance: {
+    balanceAmount: {
       type: Number,
       default: 0,
     },
     status: {
       type: String,
-      default: 'Confirmed',
+      default: 'Dispatched',
     },
-    items: [purchaseItemSchema],
   },
   {
     timestamps: true,
   }
 );
 
-module.exports = mongoose.model('Purchase', purchaseSchema);
+module.exports = mongoose.model('Dispatch', dispatchSchema);

@@ -6,6 +6,7 @@ import {
   purchaseService,
   advanceService,
   transactionService,
+  dispatchService,
 } from '../services/api';
 
 const StockContext = createContext();
@@ -18,17 +19,19 @@ export const StockProvider = ({ children }) => {
   const [advancePayments, setAdvancePayments] = useState([]);
   const [purchases, setPurchases] = useState([]);
   const [stockTransactions, setStockTransactions] = useState([]);
+  const [dispatches, setDispatches] = useState([]);
 
   // Fetch Live Data from Backend MongoDB Database on Mount
   const fetchAllFromBackend = async () => {
     try {
-      const [custRes, prodRes, brandRes, purRes, advRes, txnRes] = await Promise.all([
+      const [custRes, prodRes, brandRes, purRes, advRes, txnRes, dspRes] = await Promise.all([
         customerService.getAll().catch(() => ({ data: [] })),
         productService.getAll().catch(() => ({ data: [] })),
         brandService.getAll().catch(() => ({ data: [] })),
         purchaseService.getAll().catch(() => ({ data: [] })),
         advanceService.getAll().catch(() => ({ data: [] })),
         transactionService.getAll().catch(() => ({ data: [] })),
+        dispatchService.getAll().catch(() => ({ data: [] })),
       ]);
 
       if (custRes.data && custRes.data.length > 0) {
@@ -72,6 +75,12 @@ export const StockProvider = ({ children }) => {
         setStockTransactions(txnRes.data.map(t => ({
           ...t,
           id: t.id || t._id,
+        })));
+      }
+      if (dspRes.data && dspRes.data.length > 0) {
+        setDispatches(dspRes.data.map(d => ({
+          ...d,
+          id: d.id || d._id,
         })));
       }
     } catch (err) {
@@ -398,21 +407,39 @@ export const StockProvider = ({ children }) => {
 
   // Customer Financial Calculation Helpers
   const getCustomerTotalAdvance = (customerId) => {
-    return advancePayments
-      .filter((a) => a.customerId === customerId)
-      .reduce((sum, a) => sum + (a.amount || 0), 0);
+    const cust = customers.find((c) => c.id === customerId || c._id === customerId || c.customId === customerId);
+    const advanceSum = advancePayments
+      .filter((a) => {
+        const matchesId = a.customerId === customerId || (cust && (a.customerId === cust.customId || a.customerId === cust.id || a.customerId === cust._id));
+        const matchesName = cust && a.customerName && a.customerName.toLowerCase() === cust.name.toLowerCase();
+        return matchesId || matchesName;
+      })
+      .reduce((sum, a) => sum + (parseFloat(a.amount || a.creditAmt) || 0), 0);
+    return Math.max(advanceSum, parseFloat(cust?.credit) || 0);
   };
 
   const getCustomerTotalPurchases = (customerId) => {
-    return purchases
-      .filter((p) => p.customerId === customerId && p.status === 'Confirmed')
-      .reduce((sum, p) => sum + (p.totalPurchaseAmount || 0), 0);
+    const cust = customers.find((c) => c.id === customerId || c._id === customerId || c.customId === customerId);
+    const purchasesSum = purchases
+      .filter((p) => {
+        const matchesId = p.customerId === customerId || (cust && (p.customerId === cust.customId || p.customerId === cust.id || p.customerId === cust._id));
+        const matchesName = cust && ((p.customer && p.customer.toLowerCase() === cust.name.toLowerCase()) || (p.customerName && p.customerName.toLowerCase() === cust.name.toLowerCase()));
+        return (matchesId || matchesName) && (p.status === 'Confirmed' || !p.status);
+      })
+      .reduce((sum, p) => sum + (parseFloat(p.totalPurchaseAmount || p.netTotal || p.debit) || 0), 0);
+    return Math.max(purchasesSum, parseFloat(cust?.debit) || 0);
   };
 
   const getCustomerRemainingAdvance = (customerId) => {
     const totalAdv = getCustomerTotalAdvance(customerId);
     const totalPur = getCustomerTotalPurchases(customerId);
     return totalAdv - totalPur;
+  };
+
+  const getCustomerPendingAmount = (customerId) => {
+    const totalPur = getCustomerTotalPurchases(customerId);
+    const totalAdv = getCustomerTotalAdvance(customerId);
+    return Math.max(0, totalPur - totalAdv);
   };
 
   // Purchase Confirmation (Multi-Product Cart Allocation)
@@ -510,6 +537,42 @@ export const StockProvider = ({ children }) => {
     };
   };
 
+  const addPurchaseBill = async (billData) => {
+    try {
+      const res = await purchaseService.create(billData);
+      const saved = res.data;
+      const formatted = { ...saved, id: saved.id || saved._id || saved.purchaseId };
+      setPurchases((prev) => [formatted, ...prev]);
+      return formatted;
+    } catch (err) {
+      console.error('Error creating purchase bill in backend:', err);
+      const fallback = {
+        id: billData.purchaseId || `PRF-BILL-${Date.now()}`,
+        ...billData,
+      };
+      setPurchases((prev) => [fallback, ...prev]);
+      return fallback;
+    }
+  };
+
+  const addDispatch = async (dispatchData) => {
+    try {
+      const res = await dispatchService.create(dispatchData);
+      const saved = res.data;
+      const formatted = { ...saved, id: saved.id || saved._id || saved.dispatchId };
+      setDispatches((prev) => [formatted, ...prev]);
+      return formatted;
+    } catch (err) {
+      console.error('Error creating dispatch in backend:', err);
+      const fallback = {
+        id: dispatchData.dispatchId || `DSP-${Date.now()}`,
+        ...dispatchData,
+      };
+      setDispatches((prev) => [fallback, ...prev]);
+      return fallback;
+    }
+  };
+
   // Dashboard Aggregated Metrics
   const totalCustomersCount = customers.length;
   const totalAdvanceCollected = advancePayments.reduce((sum, a) => sum + (a.amount || 0), 0);
@@ -567,11 +630,15 @@ export const StockProvider = ({ children }) => {
         advancePayments,
         addAdvancePayment,
         purchases,
+        addPurchaseBill,
+        dispatches,
+        addDispatch,
         confirmPurchase,
         stockTransactions,
         getCustomerTotalAdvance,
         getCustomerTotalPurchases,
         getCustomerRemainingAdvance,
+        getCustomerPendingAmount,
         // Dashboard Metrics
         totalCustomersCount,
         totalAdvanceCollected,

@@ -49,4 +49,10 @@ export const transactionService = {
   delete: (id) => api.delete(`/transactions/${id}`),
 };
 
+export const dispatchService = {
+  getAll: (params) => api.get('/dispatches', { params }),
+  create: (data) => api.post('/dispatches', data),
+  delete: (id) => api.delete(`/dispatches/${id}`),
+};
+
 export default api;

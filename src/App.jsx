@@ -13,6 +13,7 @@ import Dashboard from './pages/Dashboard';
 import StockManagement from './pages/StockManagement';
 import CustomerAccounts from './pages/CustomerAccounts';
 import AdvancePayments from './pages/AdvancePayments';
+import CustomerDispatch from './pages/CustomerDispatch';
 
 const pagesMap = {
   Customers: Customers,
@@ -29,6 +30,9 @@ const pagesMap = {
   Transactions: PurchaseHistory,
   Dashboard: Dashboard,
   'Advance Payments': AdvancePayments,
+  Dispatch: CustomerDispatch,
+  'Customer Dispatch': CustomerDispatch,
+  'Dispatch Management': CustomerDispatch,
 };
 
 function App() {
