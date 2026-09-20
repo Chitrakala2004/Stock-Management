@@ -61,6 +61,7 @@ const CustomerAccounts = () => {
 
     addAdvancePayment({
       customerId: selectedCustomer.id,
+      customerName: selectedCustomer.name,
       amount: advanceForm.amount,
       date: advanceForm.date,
       paymentReference: advanceForm.paymentReference,

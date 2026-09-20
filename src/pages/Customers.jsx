@@ -262,14 +262,26 @@ const Customers = () => {
       });
     }
 
+    const currentCustCredit = parseFloat(selectedCustomer.credit) || 0;
+    const currentCustDebit = parseFloat(selectedCustomer.debit) || 0;
+    const updatedCredit = isCredit ? currentCustCredit + amt : currentCustCredit;
+    const updatedDebit = !isCredit ? currentCustDebit + amt : currentCustDebit;
+
+    if (updateCustomer) {
+      await updateCustomer(selectedCustomer.id, {
+        credit: updatedCredit,
+        debit: updatedDebit,
+      });
+    }
+
     // Update customer debit/credit balance
     setCustomers(
       customers.map((c) => {
         if (c.id === selectedCustomer.id) {
           return {
             ...c,
-            credit: isCredit ? c.credit + amt : c.credit,
-            debit: !isCredit ? c.debit + amt : c.debit,
+            credit: updatedCredit,
+            debit: updatedDebit,
           };
         }
         return c;

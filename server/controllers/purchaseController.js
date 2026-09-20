@@ -1,49 +1,8 @@
 const Purchase = require('../models/Purchase');
+const Customer = require('../models/Customer');
+const { memoryCustomers } = require('./customerController');
 
-let memoryPurchases = [
-  {
-    _id: 'PRF-BILL-101',
-    id: 'PRF-BILL-101',
-    purchaseId: 'PRF-101',
-    billNo: '101',
-    customerName: 'SAI MOHAN MARKETING',
-    customer: 'SAI MOHAN MARKETING',
-    companyName: 'SIMBA FW',
-    purchaseDate: '10-09-2026',
-    date: '10-09-2026',
-    subtotal: 307506.00,
-    discount: 0,
-    packing: 0,
-    tax: 0,
-    netTotal: 307506.00,
-    debit: 307506.00,
-    credit: 307500.00,
-    netBalance: 6.00,
-    status: 'Confirmed',
-    items: [],
-  },
-  {
-    _id: 'PRF-BILL-102',
-    id: 'PRF-BILL-102',
-    purchaseId: 'PRF-102',
-    billNo: '102',
-    customerName: 'SRI SAI TRADERS',
-    customer: 'SRI SAI TRADERS',
-    companyName: 'STANDARD FIREWORKS',
-    purchaseDate: '12-09-2026',
-    date: '12-09-2026',
-    subtotal: 150000.00,
-    discount: 0,
-    packing: 0,
-    tax: 0,
-    netTotal: 150000.00,
-    debit: 150000.00,
-    credit: 150000.00,
-    netBalance: 0.00,
-    status: 'Confirmed',
-    items: [],
-  },
-];
+let memoryPurchases = [];
 
 const getPurchases = async (req, res) => {
   try {
@@ -56,8 +15,33 @@ const getPurchases = async (req, res) => {
 };
 
 const createPurchase = async (req, res) => {
+  const debitAmt = parseFloat(req.body.netTotal || req.body.debit || req.body.totalPurchaseAmount) || 0;
+  const newAdvance = parseFloat(req.body.newAdvancePaid) || 0;
   try {
     const newPur = await Purchase.create(req.body);
+    const update = {};
+    if (debitAmt > 0) update.$inc = { debit: debitAmt };
+    if (newAdvance > 0) {
+      if (!update.$inc) update.$inc = {};
+      update.$inc.credit = newAdvance;
+    }
+    if (Object.keys(update).length > 0) {
+      const mongoose = require('mongoose');
+      let custUpdated = false;
+      if (req.body.customerId) {
+        if (mongoose.Types.ObjectId.isValid(req.body.customerId)) {
+          const doc = await Customer.findByIdAndUpdate(req.body.customerId, update, { new: true });
+          if (doc) custUpdated = true;
+        }
+        if (!custUpdated) {
+          const doc = await Customer.findOneAndUpdate({ customId: req.body.customerId }, update, { new: true });
+          if (doc) custUpdated = true;
+        }
+      }
+      if (!custUpdated && (req.body.customerName || req.body.customer)) {
+        await Customer.findOneAndUpdate({ name: req.body.customerName || req.body.customer }, update, { new: true });
+      }
+    }
     return res.status(201).json(newPur);
   } catch (error) {
     const newPur = {
@@ -66,6 +50,24 @@ const createPurchase = async (req, res) => {
       ...req.body,
     };
     memoryPurchases.unshift(newPur);
+    if (memoryCustomers) {
+      const cIdx = memoryCustomers.findIndex(
+        (c) =>
+          c.id === req.body.customerId ||
+          c._id === req.body.customerId ||
+          c.customId === req.body.customerId ||
+          (req.body.customerName && c.name?.toLowerCase() === req.body.customerName.toLowerCase()) ||
+          (req.body.customer && c.name?.toLowerCase() === req.body.customer.toLowerCase())
+      );
+      if (cIdx !== -1) {
+        if (debitAmt > 0) {
+          memoryCustomers[cIdx].debit = (parseFloat(memoryCustomers[cIdx].debit) || 0) + debitAmt;
+        }
+        if (newAdvance > 0) {
+          memoryCustomers[cIdx].credit = (parseFloat(memoryCustomers[cIdx].credit) || 0) + newAdvance;
+        }
+      }
+    }
     return res.status(201).json(newPur);
   }
 };

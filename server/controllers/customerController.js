@@ -139,11 +139,20 @@ const updateCustomer = async (req, res) => {
     if (!updated) {
       updated = await Customer.findOneAndUpdate({ customId: req.params.id }, req.body, { new: true });
     }
+    if (!updated) {
+      updated = await Customer.findOneAndUpdate({ name: req.params.id }, req.body, { new: true });
+    }
     if (updated) return res.status(200).json(updated);
   } catch (error) {
     console.error('Error in updateCustomer:', error);
   }
-  const idx = memoryCustomers.findIndex(c => c._id === req.params.id || c.id === req.params.id);
+  const idx = memoryCustomers.findIndex(
+    (c) =>
+      c._id === req.params.id ||
+      c.id === req.params.id ||
+      c.customId === req.params.id ||
+      (c.name && c.name.toLowerCase() === req.params.id.toLowerCase())
+  );
   if (idx !== -1) {
     memoryCustomers[idx] = { ...memoryCustomers[idx], ...req.body };
     return res.status(200).json(memoryCustomers[idx]);
@@ -174,4 +183,5 @@ module.exports = {
   createCustomer,
   updateCustomer,
   deleteCustomer,
+  memoryCustomers,
 };

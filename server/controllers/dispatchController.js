@@ -23,8 +23,12 @@ const createDispatch = async (req, res) => {
     // Also deduct customer credit/advance if customerId is passed
     if (req.body.customerId && req.body.totalAmount) {
       try {
+        const mongoose = require('mongoose');
+        const query = mongoose.Types.ObjectId.isValid(req.body.customerId)
+          ? { _id: req.body.customerId }
+          : { customId: req.body.customerId };
         await Customer.findOneAndUpdate(
-          { $or: [{ _id: req.body.customerId }, { customId: req.body.customerId }] },
+          query,
           { $inc: { debit: req.body.totalAmount } }
         );
       } catch (err) {

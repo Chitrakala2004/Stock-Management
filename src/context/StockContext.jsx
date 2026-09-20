@@ -369,8 +369,14 @@ export const StockProvider = ({ children }) => {
   };
 
   // Advance Payment Management
-  const addAdvancePayment = async ({ customerId, customerName, amount, date, paymentReference, paymentMethod }) => {
-    const cust = customers.find((c) => c.id === customerId || c._id === customerId || c.customId === customerId);
+  const addAdvancePayment = async ({ customerId, customerName, companyName, amount, date, paymentReference, paymentMethod }) => {
+    const cust = customers.find(
+      (c) =>
+        c.id === customerId ||
+        c._id === customerId ||
+        c.customId === customerId ||
+        (customerName && c.name?.toLowerCase() === customerName.toLowerCase())
+    );
     const resolvedName = customerName || cust?.name || 'Customer';
     const parsedAmt = parseFloat(amount) || 0;
     if (!parsedAmt) return false;
@@ -378,6 +384,7 @@ export const StockProvider = ({ children }) => {
     const payload = {
       customerId: cust?.customId || cust?.id || customerId,
       customerName: resolvedName,
+      companyName: companyName || 'SIMBA FW',
       amount: parsedAmt,
       creditAmt: parsedAmt,
       date: date || new Date().toISOString().split('T')[0],
@@ -385,24 +392,43 @@ export const StockProvider = ({ children }) => {
       paymentMethod: paymentMethod || 'Cash',
     };
 
+    let savedAdv;
     try {
       const res = await advanceService.create(payload);
       const saved = res.data;
-      const formatted = {
+      savedAdv = {
         ...saved,
         id: saved.id || saved._id,
       };
-      setAdvancePayments((prev) => [formatted, ...prev]);
-      return formatted;
+      setAdvancePayments((prev) => [savedAdv, ...prev]);
     } catch (err) {
       console.error('Error saving advance payment:', err);
-      const fallbackAdv = {
+      savedAdv = {
         id: `ADV-${Date.now()}`,
         ...payload,
       };
-      setAdvancePayments((prev) => [fallbackAdv, ...prev]);
-      return fallbackAdv;
+      setAdvancePayments((prev) => [savedAdv, ...prev]);
     }
+
+    // Synchronize Customer credit in React state and MongoDB
+    if (cust) {
+      const targetId = cust.customId || cust.id || cust._id;
+      const newCredit = (parseFloat(cust.credit) || 0) + parsedAmt;
+      setCustomers((prev) =>
+        prev.map((c) =>
+          c.id === targetId || c.customId === targetId || c._id === targetId
+            ? { ...c, credit: newCredit }
+            : c
+        )
+      );
+      try {
+        await customerService.update(targetId, { credit: newCredit });
+      } catch (err) {
+        console.error('Error updating customer credit in DB:', err);
+      }
+    }
+
+    return savedAdv;
   };
 
   // Customer Financial Calculation Helpers
@@ -538,21 +564,51 @@ export const StockProvider = ({ children }) => {
   };
 
   const addPurchaseBill = async (billData) => {
+    let formatted;
     try {
       const res = await purchaseService.create(billData);
       const saved = res.data;
-      const formatted = { ...saved, id: saved.id || saved._id || saved.purchaseId };
+      formatted = { ...saved, id: saved.id || saved._id || saved.purchaseId };
       setPurchases((prev) => [formatted, ...prev]);
-      return formatted;
     } catch (err) {
       console.error('Error creating purchase bill in backend:', err);
-      const fallback = {
+      formatted = {
         id: billData.purchaseId || `PRF-BILL-${Date.now()}`,
         ...billData,
       };
-      setPurchases((prev) => [fallback, ...prev]);
-      return fallback;
+      setPurchases((prev) => [formatted, ...prev]);
     }
+
+    // Synchronize Customer debit and credit
+    const billDebit = parseFloat(billData.netTotal || billData.debit || billData.totalPurchaseAmount) || 0;
+    const billNewAdvance = parseFloat(billData.newAdvancePaid) || 0;
+    const cust = customers.find(
+      (c) =>
+        c.id === billData.customerId ||
+        c._id === billData.customerId ||
+        c.customId === billData.customerId ||
+        (billData.customerName && c.name?.toLowerCase() === billData.customerName.toLowerCase()) ||
+        (billData.customer && c.name?.toLowerCase() === billData.customer.toLowerCase())
+    );
+    if (cust && (billDebit > 0 || billNewAdvance > 0)) {
+      const targetId = cust.customId || cust.id || cust._id;
+      const updatedDebit = (parseFloat(cust.debit) || 0) + billDebit;
+      const updatedCredit = (parseFloat(cust.credit) || 0) + billNewAdvance;
+      setCustomers((prev) =>
+        prev.map((c) =>
+          c.id === targetId || c.customId === targetId || c._id === targetId
+            ? { ...c, debit: updatedDebit, credit: updatedCredit }
+            : c
+        )
+      );
+      try {
+        await customerService.update(targetId, { debit: updatedDebit, credit: updatedCredit });
+      } catch (err) {
+        console.error('Error updating customer financial balance in DB:', err);
+      }
+    }
+
+    return formatted;
   };
 
   const addDispatch = async (dispatchData) => {

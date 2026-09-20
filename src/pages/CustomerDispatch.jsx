@@ -133,12 +133,13 @@ const CustomerDispatch = () => {
   const amountAfterDiscount = subtotal - discountAmount;
 
   const packingVal = parseFloat(packingPercent) || 0;
-  const packingAmount = (subtotal * packingVal) / 100;
+  const netAfterDisc = Math.max(0, amountAfterDiscount);
+  const packingAmount = (netAfterDisc * packingVal) / 100;
 
   const manualTaxAmount = parseFloat(taxAmountInput) || 0;
 
   const finalDispatchAmount =
-    subtotal - discountAmount + packingAmount + manualTaxAmount;
+    netAfterDisc + packingAmount + manualTaxAmount;
 
   // Advance calculations
   const originalAdvanceAmount = activeCustomer

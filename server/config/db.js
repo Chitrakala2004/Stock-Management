@@ -1,5 +1,13 @@
 const mongoose = require('mongoose');
+const dns = require('dns');
 const seedDB = require('./seed');
+
+// Resolve MongoDB Atlas SRV records using public DNS servers (fixes querySrv ECONNREFUSED on local/ISP DNS)
+try {
+  dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
+} catch (dnsErr) {
+  console.warn('DNS server override notice:', dnsErr.message);
+}
 
 let isConnected = false;
 let retryTimer = null;
@@ -39,7 +47,6 @@ const connectDB = async () => {
       serverSelectionTimeoutMS: 5000,
     });
     isConnected = true;
-    console.log(`🍃 MongoDB Connected: ${conn.connection.host}`);
     await seedDB();
   } catch (error) {
     console.error(`MongoDB connection info: ${error.message}`);

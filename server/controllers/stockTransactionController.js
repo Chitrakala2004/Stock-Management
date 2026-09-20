@@ -1,29 +1,6 @@
 const StockTransaction = require('../models/StockTransaction');
 
-let memoryTransactions = [
-  {
-    _id: 'TXN-101',
-    id: 'TXN-101',
-    customerId: 'CUST-101',
-    customerName: 'SAI MOHAN MARKETING',
-    date: '10-09-2026',
-    companyName: 'SIMBA FW',
-    debit: 307506.00,
-    credit: 0.00,
-    balance: 307506.00,
-  },
-  {
-    _id: 'TXN-102',
-    id: 'TXN-102',
-    customerId: 'CUST-102',
-    customerName: 'SRI SAI TRADERS',
-    date: '12-09-2026',
-    companyName: 'STANDARD FIREWORKS',
-    debit: 150000.00,
-    credit: 0.00,
-    balance: 150000.00,
-  },
-];
+let memoryTransactions = [];
 
 const getTransactions = async (req, res) => {
   try {

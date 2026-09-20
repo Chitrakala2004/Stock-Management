@@ -1,31 +1,8 @@
 const AdvancePayment = require('../models/AdvancePayment');
+const Customer = require('../models/Customer');
+const { memoryCustomers } = require('./customerController');
 
-let memoryAdvances = [
-  {
-    _id: 'ADV-101',
-    id: 'ADV-101',
-    customerId: 'CUST-101',
-    customerName: 'SAI MOHAN MARKETING',
-    companyName: 'SIMBA FW',
-    creditAmt: 307500.00,
-    amount: 307500.00,
-    paymentMethod: 'UPI',
-    paymentRefId: 'UPI-982341-Raipur',
-    date: '10-09-2026',
-  },
-  {
-    _id: 'ADV-102',
-    id: 'ADV-102',
-    customerId: 'CUST-102',
-    customerName: 'SRI SAI TRADERS',
-    companyName: 'STANDARD FIREWORKS',
-    creditAmt: 150000.00,
-    amount: 150000.00,
-    paymentMethod: 'Bank Transfer',
-    paymentRefId: 'NEFT-55412-Sivakasi',
-    date: '12-09-2026',
-  },
-];
+let memoryAdvances = [];
 
 const getAdvances = async (req, res) => {
   try {
@@ -38,8 +15,34 @@ const getAdvances = async (req, res) => {
 };
 
 const createAdvance = async (req, res) => {
+  const amt = parseFloat(req.body.amount || req.body.creditAmt) || 0;
   try {
     const newAdv = await AdvancePayment.create(req.body);
+    if (amt > 0) {
+      const mongoose = require('mongoose');
+      let custUpdated = false;
+      if (req.body.customerId) {
+        if (mongoose.Types.ObjectId.isValid(req.body.customerId)) {
+          const doc = await Customer.findByIdAndUpdate(req.body.customerId, { $inc: { credit: amt } }, { new: true });
+          if (doc) custUpdated = true;
+        }
+        if (!custUpdated) {
+          const doc = await Customer.findOneAndUpdate(
+            { customId: req.body.customerId },
+            { $inc: { credit: amt } },
+            { new: true }
+          );
+          if (doc) custUpdated = true;
+        }
+      }
+      if (!custUpdated && req.body.customerName) {
+        await Customer.findOneAndUpdate(
+          { name: req.body.customerName },
+          { $inc: { credit: amt } },
+          { new: true }
+        );
+      }
+    }
     return res.status(201).json(newAdv);
   } catch (error) {
     const newAdv = {
@@ -48,6 +51,18 @@ const createAdvance = async (req, res) => {
       ...req.body,
     };
     memoryAdvances.unshift(newAdv);
+    if (amt > 0 && memoryCustomers) {
+      const cIdx = memoryCustomers.findIndex(
+        (c) =>
+          c.id === req.body.customerId ||
+          c._id === req.body.customerId ||
+          c.customId === req.body.customerId ||
+          (req.body.customerName && c.name?.toLowerCase() === req.body.customerName.toLowerCase())
+      );
+      if (cIdx !== -1) {
+        memoryCustomers[cIdx].credit = (parseFloat(memoryCustomers[cIdx].credit) || 0) + amt;
+      }
+    }
     return res.status(201).json(newAdv);
   }
 };

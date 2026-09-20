@@ -23,6 +23,7 @@ import {
   Printer,
   RotateCcw,
   Boxes,
+  Truck,
 } from 'lucide-react';
 import Modal from '../components/Modal';
 
@@ -79,6 +80,7 @@ const PurchaseEntry = () => {
     getCustomerPendingAmount = () => 0,
     getNextCustomerId,
     addCustomer,
+    updateCustomer,
     addAdvancePayment,
     selectedCustomerIdForStatement,
     targetPerformoTab,
@@ -158,6 +160,7 @@ const PurchaseEntry = () => {
 
   // Selected customer & purchase date (empty by default)
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
+  const [step2Customer, setStep2Customer] = useState('');
 
   // Helper to extract customer numeric prefix (e.g. '101' from 'CUST-101')
   const getCustomerNumber = (custIdOrObj) => {
@@ -170,11 +173,25 @@ const PurchaseEntry = () => {
     return match ? match[0] : '101';
   };
 
-  // Active Customer & Current Customer Number Prefix
-  const activeCustomer =
-    customersList.find((c) => c.id === selectedCustomerId) ||
-    customersList[0];
-  const currentCustNum = getCustomerNumber(activeCustomer?.customId || activeCustomer?.id || selectedCustomerId);
+  // Active Customer & Current Customer Number Prefix (Strict match - no arbitrary fallback to first customer)
+  const activeCustomer = React.useMemo(() => {
+    if (selectedCustomerId) {
+      return (
+        customersList.find(
+          (c) =>
+            c.id === selectedCustomerId ||
+            c.customId === selectedCustomerId ||
+            c.mongoId === selectedCustomerId
+        ) || null
+      );
+    }
+    if (step2Customer) {
+      return customersList.find((c) => c.name?.toLowerCase() === step2Customer.toLowerCase()) || null;
+    }
+    return null;
+  }, [selectedCustomerId, step2Customer, customersList]);
+
+  const currentCustNum = activeCustomer ? getCustomerNumber(activeCustomer) : '101';
 
   // Listen for Statement navigation requests from All Performo or other pages
   useEffect(() => {
@@ -187,6 +204,7 @@ const PurchaseEntry = () => {
       );
       if (match) {
         setSelectedCustomerId(match.id);
+        setStep2Customer(match.name);
       }
       if (targetPerformoTab) {
         setActiveTab(targetPerformoTab);
@@ -206,19 +224,19 @@ const PurchaseEntry = () => {
     );
     if (match) {
       setSelectedCustomerId(match.id);
+      setStep2Customer(match.name);
     }
     setActiveTab('account');
   };
   const [purchaseDate, setPurchaseDate] = useState(getTodayDateString());
   const [customerAdvanceInput, setCustomerAdvanceInput] = useState('');
 
-  // Auto-sync customer name & advance input when selectedCustomerId or customersList changes
+  // Auto-sync step2Customer name when selectedCustomerId changes
   useEffect(() => {
     if (selectedCustomerId && customersList.length > 0) {
       const cust = customersList.find((c) => c.id === selectedCustomerId);
       if (cust) {
         setStep2Customer(cust.name);
-        setCustomerAdvanceInput('0');
       }
     }
   }, [selectedCustomerId, customersList]);
@@ -301,7 +319,6 @@ const PurchaseEntry = () => {
   const [editingRowIndex, setEditingRowIndex] = useState(null);
 
   // Step 2 Billing & Customer Form Controls State
-  const [step2Customer, setStep2Customer] = useState('');
   const [step2CaseCount, setStep2CaseCount] = useState('');
   const [step2Company, setStep2Company] = useState('SIMBA FW');
   const [step2Discount, setStep2Discount] = useState('');
@@ -405,13 +422,14 @@ const PurchaseEntry = () => {
     }
   }, [addedRequiredProducts, currentCustNum, contextProducts, step2Company]);
 
-  // Active single entry row input state (Product Name, Company Name [optional], Cases)
+  // Active single entry row input state (Product Name, Active Company [Text Box], Cases)
   const [reqEntryProduct, setReqEntryProduct] = useState('');
-  const [reqEntryCompany, setReqEntryCompany] = useState('');
+  const [reqActiveCompany, setReqActiveCompany] = useState('');
   const [reqEntryCases, setReqEntryCases] = useState('');
   const [editingRequiredId, setEditingRequiredId] = useState(null);
 
   // Input refs for cursor Enter navigation
+  const reqCompanyInputRef = useRef(null);
   const reqProdInputRef = useRef(null);
   const reqCasesInputRef = useRef(null);
 
@@ -419,26 +437,54 @@ const PurchaseEntry = () => {
     new Set([
       ...companyOptions,
       ...(contextBrands || []).map((b) => (typeof b === 'string' ? b : b?.name)).filter(Boolean),
+      ...((contextProducts || []).map((p) => p.brand || p.company || p.companyName).filter(Boolean)),
     ])
   );
 
-  const allProductSuggestions = Array.from(
-    new Set([
-      ...particularOptions,
-      ...(contextProducts || []).map((p) => p.name).filter(Boolean),
-    ])
-  );
+  // Product suggestions: prioritize products matching active company
+  const allProductSuggestions = React.useMemo(() => {
+    const activeComp = (reqActiveCompany || '').trim().toLowerCase();
+    const baseList = Array.from(
+      new Set([
+        ...particularOptions,
+        ...(contextProducts || []).map((p) => p.name).filter(Boolean),
+      ])
+    );
+
+    if (!activeComp) {
+      return baseList;
+    }
+
+    // Products belonging to the active company
+    const brandProducts = (contextProducts || [])
+      .filter((p) => {
+        const pBrand = (p.brand || p.company || p.companyName || '').toLowerCase();
+        return pBrand && (pBrand.includes(activeComp) || activeComp.includes(pBrand));
+      })
+      .map((p) => p.name)
+      .filter(Boolean);
+
+    return Array.from(new Set([...brandProducts, ...baseList]));
+  }, [reqActiveCompany, contextProducts]);
 
   // Add new item below or update existing item
   const handleAddOrUpdateRequired = () => {
     const prodName = reqEntryProduct.trim();
     const casesVal = reqEntryCases.trim();
-    const compName = reqEntryCompany.trim();
 
     if (!prodName && !casesVal) {
       reqProdInputRef.current?.focus();
       return;
     }
+
+    // Auto-resolve brand/company from catalog or active company
+    const matchedProd = (contextProducts || []).find(
+      (p) => p.name?.toLowerCase() === prodName.toLowerCase()
+    );
+    const compName = (reqActiveCompany || matchedProd?.brand || matchedProd?.company || 'General Products')
+      .trim()
+      .replace(/\s+/g, ' ')
+      .toUpperCase();
 
     if (editingRequiredId) {
       // Update existing item in place
@@ -460,36 +506,64 @@ const PurchaseEntry = () => {
         message: `Updated product requirement "${prodName || 'Item'}".`,
       });
     } else {
-      // Add new item to list below with sequential Product ID (e.g. 101-01, 101-02)
-      const nextIndex = addedRequiredProducts.length + 1;
-      const newItem = {
-        id: Date.now(),
-        productId: `${currentCustNum}-${String(nextIndex).padStart(2, '0')}`,
-        productName: prodName || 'Unspecified Item',
-        companyName: compName,
-        cases: casesVal || '0',
-      };
-      setAddedRequiredProducts((prev) => [...prev, newItem]);
+      // Check if product with same name already exists under this company
+      const existingIndex = addedRequiredProducts.findIndex(
+        (item) =>
+          (item.companyName || '').trim().replace(/\s+/g, ' ').toUpperCase() === compName &&
+          item.productName?.trim().toLowerCase() === prodName.toLowerCase()
+      );
+
+      if (existingIndex !== -1) {
+        const existingItem = addedRequiredProducts[existingIndex];
+        const prevCases = parseFloat(existingItem.cases) || 0;
+        const addCases = parseFloat(casesVal) || 0;
+        const newCases = prevCases + addCases;
+
+        setAddedRequiredProducts((prev) =>
+          prev.map((it, idx) =>
+            idx === existingIndex ? { ...it, cases: newCases.toString() } : it
+          )
+        );
+        setFeedback({
+          type: 'success',
+          message: `Added ${casesVal || 0} cases to "${prodName}" under ${compName}. Total: ${newCases} Cases.`,
+        });
+      } else {
+        const nextIndex = addedRequiredProducts.length + 1;
+        const newItem = {
+          id: Date.now(),
+          productId: `${currentCustNum}-${String(nextIndex).padStart(2, '0')}`,
+          productName: prodName || 'Unspecified Item',
+          companyName: compName,
+          cases: casesVal || '0',
+        };
+        setAddedRequiredProducts((prev) => [...prev, newItem]);
+        setFeedback({
+          type: 'success',
+          message: `Added "${prodName}" under ${compName} (${casesVal} Cases).`,
+        });
+      }
     }
 
-    // Clear entry inputs and refocus product input for continuous fast entry
+    // Clear product and cases inputs, but KEEP reqActiveCompany active for continuous multi-product entry under same company!
     setReqEntryProduct('');
-    setReqEntryCompany('');
     setReqEntryCases('');
     setTimeout(() => {
       reqProdInputRef.current?.focus();
     }, 40);
   };
 
-  // Keyboard Enter navigation: Product Name -> Cases -> Add to table below!
+  // Keyboard Enter navigation: Company -> Product Name -> Cases -> Add to table below!
   const handleReqKeyDown = (e, field) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      if (field === 'product') {
+      if (field === 'company') {
+        reqProdInputRef.current?.focus();
+        reqProdInputRef.current?.select?.();
+      } else if (field === 'product') {
         reqCasesInputRef.current?.focus();
         reqCasesInputRef.current?.select?.();
       } else if (field === 'cases') {
-        // Pressing Enter in Cases box directly adds item to the list below!
         handleAddOrUpdateRequired();
       }
     }
@@ -499,7 +573,7 @@ const PurchaseEntry = () => {
   const handleEditRequiredItem = (item) => {
     setEditingRequiredId(item.id);
     setReqEntryProduct(item.productName || '');
-    setReqEntryCompany(item.companyName || '');
+    setReqActiveCompany(item.companyName || '');
     setReqEntryCases(item.cases !== undefined ? item.cases.toString() : '');
     setTimeout(() => {
       reqProdInputRef.current?.focus();
@@ -511,7 +585,6 @@ const PurchaseEntry = () => {
   const handleCancelEditRequired = () => {
     setEditingRequiredId(null);
     setReqEntryProduct('');
-    setReqEntryCompany('');
     setReqEntryCases('');
     reqProdInputRef.current?.focus();
   };
@@ -526,10 +599,42 @@ const PurchaseEntry = () => {
 
   // Reset/Clear all items
   const handleClearAllRequired = () => {
-    if (addedRequiredProducts.length === 0 && !reqEntryProduct && !reqEntryCases && !reqEntryCompany) return;
+    if (addedRequiredProducts.length === 0 && !reqEntryProduct && !reqEntryCases && !reqActiveCompany) return;
     setAddedRequiredProducts([]);
+    setReqActiveCompany('');
     handleCancelEditRequired();
   };
+
+  // Group added products by company preserving insertion order (matching wholesale cracker sheet format)
+  // Normalizes company name so same company products always group together without duplicate headers!
+  const groupedRequiredProducts = React.useMemo(() => {
+    const groups = [];
+    const map = new Map();
+
+    addedRequiredProducts.forEach((item, index) => {
+      const rawComp = (item.companyName || '').trim().replace(/\s+/g, ' ');
+      const compKey = rawComp.toUpperCase();
+
+      if (!map.has(compKey)) {
+        const display = compKey || 'GENERAL PRODUCTS';
+        const newGroup = {
+          companyKey: compKey,
+          companyName: rawComp || compKey,
+          displayTitle: display,
+          items: [],
+          totalCases: 0,
+        };
+        map.set(compKey, newGroup);
+        groups.push(newGroup);
+      }
+      const g = map.get(compKey);
+      const casesNum = parseFloat(item.cases) || 0;
+      g.items.push({ ...item, originalIndex: index });
+      g.totalCases += casesNum;
+    });
+
+    return groups;
+  }, [addedRequiredProducts]);
 
   // Dynamic Case Total of added items (Amount total removed)
   const totalRequiredCases = addedRequiredProducts.reduce((sum, item) => {
@@ -543,21 +648,15 @@ const PurchaseEntry = () => {
   }, [totalRequiredCases]);
 
   // Proceed to Product Entry & Billing Setup Handler
-  // Only works after selecting customer account and entering product requirements!
+  // Works reliably: auto-selects first customer if none chosen, and always navigates smoothly to Step 2
   const handleProceedToBilling = () => {
-    if (!selectedCustomerId) {
-      setFeedback({
-        type: 'error',
-        message: 'Please select a Customer Account first.',
-      });
-      return;
-    }
-    if (addedRequiredProducts.length === 0) {
-      setFeedback({
-        type: 'error',
-        message: 'Please enter and add at least one product requirement in Product Required before proceeding to billing setup.',
-      });
-      return;
+    // If no customer selected yet, auto-select the first available customer
+    if (!selectedCustomerId && customersList.length > 0) {
+      const firstCust = customersList[0];
+      setSelectedCustomerId(firstCust.id);
+      setStep2Customer(firstCust.name);
+    } else if (!step2Customer) {
+      setStep2Customer(activeCustomer ? activeCustomer.name : 'General Customer');
     }
 
     // Auto-sync total cases to Step 2
@@ -593,10 +692,13 @@ const PurchaseEntry = () => {
       setProductRows(generatedBillingRows);
     }
 
+    // Always switch tab to Step 2 (Product Entry & Billing Setup)
     setActiveTab('product');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
     setFeedback({
       type: 'success',
-      message: `Customer "${activeCustomer?.name || 'Customer'}" and ${addedRequiredProducts.length} product requirements ready for billing.`,
+      message: `Proceeded to Product Entry & Billing Setup.`,
     });
   };
 
@@ -609,43 +711,118 @@ const PurchaseEntry = () => {
 
     const printWindow = window.open('', '_blank', 'width=850,height=900');
     if (!printWindow) {
-      alert('Please allow popups to download/print the requirement sheet.');
+      alert('Please allow popups to print/download the requirement sheet.');
       return;
     }
 
-    const customerName = activeCustomer?.name || step2Customer || 'Valued Customer';
-    const customerPhone = activeCustomer?.phone || 'N/A';
-    const customerAddress = activeCustomer?.address || 'N/A';
-    const customerGst = activeCustomer?.gst || 'N/A';
-    const formattedDate = purchaseDate || new Date().toISOString().split('T')[0];
+    const customerName = activeCustomer ? activeCustomer.name : 'Customer Requirement';
+    const customerPhone = activeCustomer && activeCustomer.phone ? activeCustomer.phone : 'N/A';
+    const customerAddress = activeCustomer && activeCustomer.address ? activeCustomer.address : 'N/A';
+    const customerGst = activeCustomer && activeCustomer.gst ? activeCustomer.gst : 'N/A';
+    const formattedDate = purchaseDate || getTodayDateString();
 
     const htmlContent = `<!DOCTYPE html>
 <html>
   <head>
-    <meta charset="utf-8" />
-    <title>Customer_Requirement_${customerName.replace(/[^a-zA-Z0-9]/g, '_')}_${formattedDate}</title>
+    <title>Customer Product Requirement - ${customerName}</title>
     <style>
-      @page { size: A4; margin: 12mm; }
-      * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
-      body { color: #0f172a; padding: 20px; background: #fff; margin: 0; }
-      .header-box { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #2563eb; padding-bottom: 14px; margin-bottom: 18px; }
-      .brand-title { font-size: 22px; font-weight: 800; color: #1e3a8a; margin: 0 0 4px 0; }
-      .brand-subtitle { font-size: 11px; color: #64748b; margin: 0; font-weight: 500; }
-      .doc-badge { text-align: right; background: #eff6ff; padding: 6px 12px; border-radius: 8px; border: 1px solid #bfdbfe; font-weight: 700; font-size: 12px; color: #1d4ed8; }
-      .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; }
-      .info-block p { margin: 3px 0; font-size: 11px; }
-      .info-label { color: #64748b; font-weight: 600; }
-      .info-val { color: #0f172a; font-weight: 700; }
-      table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 11px; }
-      th { background: #f1f5f9; color: #334155; padding: 8px 10px; text-align: left; font-weight: 700; border: 1px solid #cbd5e1; }
-      td { padding: 8px 10px; border: 1px solid #e2e8f0; }
+      @page { size: A4 portrait; margin: 12mm; }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        color: #0f172a;
+        margin: 0;
+        padding: 16px;
+        background: #fff;
+      }
+      .no-print-bar {
+        background: #1e293b;
+        color: #fff;
+        padding: 10px 16px;
+        border-radius: 8px;
+        margin-bottom: 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .btn-print {
+        background: #2563eb;
+        color: #fff;
+        border: none;
+        padding: 8px 18px;
+        font-weight: bold;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      .header-box {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        border-bottom: 2px solid #0f172a;
+        padding-bottom: 12px;
+        margin-bottom: 16px;
+      }
+      .brand-title { font-size: 24px; font-weight: 900; margin: 0; color: #1e3a8a; letter-spacing: -0.5px; }
+      .brand-subtitle { font-size: 11px; color: #64748b; margin: 2px 0 0 0; text-transform: uppercase; letter-spacing: 1px; }
+      .doc-badge {
+        background: #f1f5f9;
+        border: 1px solid #cbd5e1;
+        padding: 6px 14px;
+        border-radius: 6px;
+        text-align: right;
+        font-weight: 800;
+        font-size: 14px;
+        color: #0f172a;
+      }
+      .info-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 12px 16px;
+        margin-bottom: 16px;
+        font-size: 12px;
+      }
+      .info-block p { margin: 3px 0; }
+      .info-label { font-weight: 700; color: #475569; width: 110px; display: inline-block; }
+      .info-val { font-weight: 700; color: #0f172a; }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 8px;
+        font-size: 12px;
+      }
+      th {
+        background: #1e293b;
+        color: #fff;
+        padding: 8px 10px;
+        text-align: left;
+        font-weight: 700;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      td {
+        padding: 7px 10px;
+        border-bottom: 1px solid #e2e8f0;
+      }
       .text-center { text-align: center; }
-      .total-row td { background: #f8fafc; font-weight: 800; font-size: 12px; border-top: 2px solid #94a3b8; }
-      .footer-section { margin-top: 40px; display: flex; justify-content: space-between; align-items: flex-end; }
-      .sign-box { text-align: center; }
-      .sign-line { border-top: 1px solid #94a3b8; width: 180px; padding-top: 6px; font-size: 11px; font-weight: 600; color: #475569; }
-      .no-print-bar { background: #eff6ff; border: 1px solid #93c5fd; padding: 8px 16px; margin-bottom: 16px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; }
-      .btn-print { background: #2563eb; color: white; border: none; padding: 6px 14px; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer; }
+      .total-row {
+        background: #f8fafc;
+        font-weight: 800;
+        font-size: 13px;
+        border-top: 2px solid #0f172a;
+      }
+      .footer-section {
+        margin-top: 36px;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        padding-top: 24px;
+      }
+      .sign-box { text-align: center; width: 180px; }
+      .sign-line { border-top: 1px dashed #64748b; margin-top: 40px; padding-top: 4px; font-size: 11px; font-weight: 700; color: #334155; }
       @media print {
         .no-print-bar { display: none !important; }
         body { padding: 0; }
@@ -684,25 +861,34 @@ const PurchaseEntry = () => {
         <tr>
           <th class="text-center" style="width: 100px;">Product ID</th>
           <th>Product Required</th>
-          <th style="width: 160px;">Company</th>
           <th class="text-center" style="width: 140px;">Requested Cases</th>
         </tr>
       </thead>
       <tbody>
-        ${addedRequiredProducts
+        ${groupedRequiredProducts
         .map(
-          (item, idx) => `
-          <tr>
-            <td class="text-center" style="font-weight: 700; color: #1d4ed8; font-family: monospace;">${item.productId || `${currentCustNum}-${String(idx + 1).padStart(2, '0')}`}</td>
-            <td style="font-weight: 600;">${item.productName || 'Unspecified Item'}</td>
-            <td style="color: #475569; font-weight: 600;">${item.companyName || '-'}</td>
-            <td class="text-center" style="font-weight: 700; color: #1d4ed8;">${item.cases || '0'} Cases</td>
+          (group) => `
+          <tr style="background-color: #f1f5f9; border-top: 2px solid #0f172a; border-bottom: 2px solid #0f172a;">
+            <td colspan="3" style="padding: 7px 12px; font-weight: 900; font-size: 13px; text-decoration: underline; text-underline-offset: 3px; text-transform: uppercase; color: #0f172a; letter-spacing: 0.5px;">
+              ${group.displayTitle}
+            </td>
           </tr>
+          ${group.items
+            .map(
+              (item) => `
+            <tr>
+              <td class="text-center" style="font-weight: 700; color: #1d4ed8; font-family: monospace;">${item.productId || `${currentCustNum}-${String(item.originalIndex + 1).padStart(2, '0')}`}</td>
+              <td style="font-weight: 600; padding-left: 20px;">${item.productName || 'Unspecified Item'}</td>
+              <td class="text-center" style="font-weight: 700; color: #1d4ed8;">${item.cases || '0'} Cases</td>
+            </tr>
+          `
+            )
+            .join('')}
         `
         )
         .join('')}
         <tr class="total-row">
-          <td colspan="3" style="text-align: right; text-transform: uppercase;">Total Cases Required:</td>
+          <td colspan="2" style="text-align: right; text-transform: uppercase;">Total Cases Required:</td>
           <td class="text-center" style="color: #1d4ed8;">${totalRequiredCases} Cases</td>
         </tr>
       </tbody>
@@ -743,8 +929,16 @@ const PurchaseEntry = () => {
     desc: '',
   });
 
-  const handleDeletePerformoBill = (id) => {
-    setPerformoBills(performoBills.filter((b) => b.id !== id));
+  const handleDeletePerformoBill = async (id) => {
+    setPerformoBills((prev) => prev.filter((b) => b.id !== id && b._id !== id));
+    setTransactions((prev) => prev.filter((t) => t.id !== id && t._id !== id));
+    try {
+      if (purchaseService?.delete) {
+        await purchaseService.delete(id);
+      }
+    } catch (e) {
+      // ignore
+    }
   };
 
   const handleEditPerformoBill = (bill) => {
@@ -812,28 +1006,78 @@ const PurchaseEntry = () => {
   // Formula: Product amount = Total Units × Rate (e.g. 50 × ₹20 = ₹1,000.00)
   const calculatedEntryAmount = (pktUnitsVal > 0 ? totalUnitsCalculated : casesVal) * rateVal;
 
+  // Filter Performo bills for active customer
+  const customerPerformoBills = React.useMemo(() => {
+    if (!activeCustomer) return [];
+    return performoBills.filter(
+      (b) =>
+        b.customerId === activeCustomer.id ||
+        b.customerId === activeCustomer._id ||
+        b.customerId === activeCustomer.customId ||
+        b.customer?.toLowerCase() === activeCustomer.name?.toLowerCase() ||
+        b.customerName?.toLowerCase() === activeCustomer.name?.toLowerCase()
+    );
+  }, [performoBills, activeCustomer]);
+
+  // Purchase bills for active customer (Purchase details that appear in Account Details)
+  const customerPurchaseDetails = React.useMemo(() => {
+    if (!activeCustomer) return [];
+    return customerPerformoBills.map((b) => ({
+      id: b.id || b._id,
+      billNo: b.billNo || (b.purchaseId ? b.purchaseId.replace('PRF-', '') : ''),
+      date: b.date || b.purchaseDate || getTodayDateString(),
+      customerName: b.customerName || b.customer || activeCustomer.name,
+      companyName: b.companyName || (b.items && b.items[0]?.companyName) || 'SIMBA FW',
+      debit: parseFloat(b.netTotal || b.debit || b.subtotal) || 0,
+      credit: parseFloat(b.credit || b.totalAvailableAdvance || b.newAdvancePaid) || 0,
+      balance: Math.abs(parseFloat(b.netBalance !== undefined ? b.netBalance : b.balance) || 0),
+      items: b.items || [],
+      rawBill: b,
+    }));
+  }, [customerPerformoBills, activeCustomer]);
+
   // Filter transactions for active customer
   const customerTransactionsList = transactions.filter(
     (t) =>
       t.customerId === activeCustomer?.id ||
+      t.customerId === activeCustomer?.customId ||
       t.customerName?.toLowerCase() === activeCustomer?.name?.toLowerCase()
   );
 
-  // Filter Performo bills for active customer
-  const customerPerformoBills = performoBills.filter(
-    (b) =>
-      b.customerId === activeCustomer?.id ||
-      b.customer?.toLowerCase() === activeCustomer?.name?.toLowerCase()
-  );
+  // Start fresh next order for the active customer with incremented bill number
+  const handleStartNextOrder = () => {
+    const nextBillNo = getNextAutoBillNo();
+    setStep2BillNo(nextBillNo);
+    setAddedRequiredProducts([]);
+    setProductRows([]);
+    setCustomerAdvanceInput('');
+    setReqEntryProduct('');
+    setReqEntryCases('');
+    setStep2Discount('');
+    setStep2Packing('');
+    setStep2Tax('');
+
+    if (activeCustomer) {
+      setStep2Customer(activeCustomer.name);
+    }
+
+    setActiveTab('product');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    setFeedback({
+      type: 'success',
+      message: `Started New Order for ${activeCustomer ? activeCustomer.name : 'Customer'}. Bill #${nextBillNo} ready.`,
+    });
+  };
 
   // Previous remaining balance of the customer from previous orders/advances
-  const customerPreviousRemaining = selectedCustomerId
+  const customerPreviousRemaining = activeCustomer
     ? (getCustomerRemainingAdvance
-      ? getCustomerRemainingAdvance(selectedCustomerId)
+      ? getCustomerRemainingAdvance(activeCustomer.id || activeCustomer.customId)
       : ((activeCustomer?.credit || 0) - (activeCustomer?.debit || 0)))
     : 0;
 
-  const isCurrentCustomerNew = selectedCustomerId
+  const isCurrentCustomerNew = activeCustomer
     ? ((activeCustomer?.debit || 0) === 0 &&
       (activeCustomer?.credit || 0) === 0 &&
       (!customerPerformoBills || customerPerformoBills.length === 0))
@@ -845,6 +1089,121 @@ const PurchaseEntry = () => {
   // Total Advance available for this order = (Previous Remaining Amount for old customer) + (New Advance entered today)
   const totalEffectiveAdvance = (isCurrentCustomerNew ? 0 : customerPreviousRemaining) + newlyEnteredAdvance;
   const remainingAdvance = totalEffectiveAdvance;
+
+  // ── Customer Pending Cases to Send List ──
+  // Extracts remaining cases (caseRequired > caseOut) from all previous confirmed bills for activeCustomer
+  const customerPendingCasesList = React.useMemo(() => {
+    if (!activeCustomer) return [];
+
+    const pendingList = [];
+    customerPerformoBills.forEach((bill) => {
+      const bNo = bill.billNo || (bill.purchaseId ? bill.purchaseId.replace('PRF-', '') : 'Bill');
+      const bDate = bill.date || bill.purchaseDate || '';
+
+      (bill.items || []).forEach((item, idx) => {
+        const req = parseFloat(item.caseRequired !== undefined ? item.caseRequired : (item.totalCases || item.caseCount || 0)) || 0;
+        const out = parseFloat(item.caseOut !== undefined ? item.caseOut : (item.dispatchedCases || 0)) || 0;
+        const pending = Math.max(0, req - out);
+
+        if (pending > 0) {
+          pendingList.push({
+            id: `${bill.id || bNo}-${idx}-${item.productId || ''}`,
+            billId: bill.id,
+            billNo: bNo,
+            date: bDate,
+            productName: item.particular || item.productName || 'Cracker Item',
+            companyName: item.companyName || item.brand || bill.companyName || 'SIMBA FW',
+            caseRequired: req,
+            caseOut: out,
+            pendingCases: pending,
+            rate: item.rate || 0,
+            pktUnits: item.pktUnits || 1,
+            amount: item.amount || 0,
+          });
+        }
+      });
+    });
+
+    return pendingList;
+  }, [customerPerformoBills, activeCustomer]);
+
+  const totalPendingCasesToSend = React.useMemo(() => {
+    return customerPendingCasesList.reduce((sum, item) => sum + (item.pendingCases || 0), 0);
+  }, [customerPendingCasesList]);
+
+  // Handler to load a single pending case item into current requirement order
+  const handleLoadSinglePendingCase = (item) => {
+    setAddedRequiredProducts((prev) => {
+      const existingIdx = prev.findIndex(
+        (p) =>
+          p.productName?.toLowerCase() === item.productName?.toLowerCase() &&
+          (p.companyName || '').toUpperCase() === (item.companyName || '').toUpperCase()
+      );
+      if (existingIdx !== -1) {
+        const updated = [...prev];
+        const prevCases = parseFloat(updated[existingIdx].cases) || 0;
+        updated[existingIdx] = {
+          ...updated[existingIdx],
+          cases: (prevCases + item.pendingCases).toString(),
+        };
+        return updated;
+      }
+      return [
+        ...prev,
+        {
+          id: Date.now() + Math.random(),
+          productId: `${currentCustNum}-${String(prev.length + 1).padStart(2, '0')}`,
+          productName: item.productName,
+          companyName: item.companyName,
+          cases: item.pendingCases.toString(),
+          pktUnits: item.pktUnits,
+        },
+      ];
+    });
+
+    setFeedback({
+      type: 'success',
+      message: `Added ${item.pendingCases} pending cases of "${item.productName}" (Bill #${item.billNo}) to order requirements.`,
+    });
+  };
+
+  // Handler to load all pending cases into current requirement order
+  const handleLoadAllPendingCases = () => {
+    if (customerPendingCasesList.length === 0) return;
+
+    setAddedRequiredProducts((prev) => {
+      let currentList = [...prev];
+      customerPendingCasesList.forEach((item) => {
+        const existingIdx = currentList.findIndex(
+          (p) =>
+            p.productName?.toLowerCase() === item.productName?.toLowerCase() &&
+            (p.companyName || '').toUpperCase() === (item.companyName || '').toUpperCase()
+        );
+        if (existingIdx !== -1) {
+          const prevCases = parseFloat(currentList[existingIdx].cases) || 0;
+          currentList[existingIdx] = {
+            ...currentList[existingIdx],
+            cases: (prevCases + item.pendingCases).toString(),
+          };
+        } else {
+          currentList.push({
+            id: Date.now() + Math.random(),
+            productId: `${currentCustNum}-${String(currentList.length + 1).padStart(2, '0')}`,
+            productName: item.productName,
+            companyName: item.companyName,
+            cases: item.pendingCases.toString(),
+            pktUnits: item.pktUnits,
+          });
+        }
+      });
+      return currentList;
+    });
+
+    setFeedback({
+      type: 'success',
+      message: `Loaded all ${totalPendingCasesToSend} pending cases into current order requirements.`,
+    });
+  };
 
   const handleDeleteTransaction = (id) => {
     setTransactions(transactions.filter((t) => t.id !== id));
@@ -992,10 +1351,11 @@ const PurchaseEntry = () => {
   const taxAmount = parseFloat(step2Tax) || 0; // Direct manual Rupee Amount
 
   const discountAmount = (subtotalAmount * discountVal) / 100;
-  const packingAmount = (subtotalAmount * packingVal) / 100;
+  const netTotalAfterDiscount = Math.max(0, subtotalAmount - discountAmount);
+  const packingAmount = (netTotalAfterDiscount * packingVal) / 100;
 
   const grandTotalAmount =
-    subtotalAmount - discountAmount + packingAmount + taxAmount;
+    netTotalAfterDiscount + packingAmount + taxAmount;
 
   // Dynamic Reductions as products are added/accumulated in table
   const dynamicRemainingCases = initialCasesAllocated - totalAddedCases;
@@ -1024,21 +1384,31 @@ const PurchaseEntry = () => {
       }
 
       const targetCustomerName =
-        step2Customer && step2Customer !== 'SAI MOHAN M...'
-          ? step2Customer
-          : activeCustomer
-            ? activeCustomer.name
-            : 'SAI MOHAN MARKETING';
+        activeCustomer
+          ? activeCustomer.name
+          : (step2Customer || 'General Customer');
 
-      // 1. Update customer debit balance
+      const targetCustomerId = activeCustomer
+        ? (activeCustomer.id || activeCustomer.customId)
+        : (customersList.find((c) => c.name === targetCustomerName)?.id || 'CUST-GEN');
+
+      // 1. Update customer debit & credit balance
       if (activeCustomer) {
+        const newDebit = (parseFloat(activeCustomer.debit) || 0) + grandTotalAmount;
+        const newCredit = (parseFloat(activeCustomer.credit) || 0) + newlyEnteredAdvance;
         setCustomersList((prev) =>
           prev.map((c) =>
             c.id === activeCustomer.id
-              ? { ...c, debit: c.debit + grandTotalAmount }
+              ? { ...c, debit: newDebit, credit: newCredit }
               : c
           )
         );
+        if (updateCustomer) {
+          updateCustomer(activeCustomer.id || activeCustomer.mongoId, {
+            debit: newDebit,
+            credit: newCredit,
+          });
+        }
       }
 
       // 2. Add new Performo Bill
@@ -1065,7 +1435,7 @@ const PurchaseEntry = () => {
         billNo: currentBillNo,
         customer: targetCustomerName,
         customerName: targetCustomerName,
-        customerId: activeCustomer ? activeCustomer.id : 'CUST-101',
+        customerId: targetCustomerId,
         companyName: productRows[0]?.companyName || productRows[0]?.brand || step2Company || 'SIMBA FW',
         date: step2Date || purchaseDate || getTodayDateString(),
         subtotal: subtotalAmount,
@@ -1092,7 +1462,7 @@ const PurchaseEntry = () => {
       if (stockContext?.addDispatch) {
         stockContext.addDispatch({
           dispatchId: `DSP-${currentBillNo}-${Date.now().toString().slice(-4)}`,
-          customerId: activeCustomer ? activeCustomer.id : 'CUST-101',
+          customerId: targetCustomerId,
           customerName: targetCustomerName,
           customerPhone: activeCustomer?.phone || '',
           date: step2Date || purchaseDate || getTodayDateString(),
@@ -1112,8 +1482,9 @@ const PurchaseEntry = () => {
       // If admin entered a new advance for customer, record it in advance payments
       if (newlyEnteredAdvance > 0 && addAdvancePayment) {
         addAdvancePayment({
-          customerId: activeCustomer?.id || 'CUST-101',
+          customerId: targetCustomerId,
           customerName: targetCustomerName,
+          companyName: productRows[0]?.companyName || productRows[0]?.brand || step2Company || 'SIMBA FW',
           amount: newlyEnteredAdvance,
           date: step2Date || purchaseDate || getTodayDateString(),
           paymentReference: `ADV-${currentBillNo}`,
@@ -1124,7 +1495,7 @@ const PurchaseEntry = () => {
       // 3. Add to ledger transactions history
       const newTxn = {
         id: `TXN-${Date.now()}`,
-        customerId: activeCustomer ? activeCustomer.id : 'CUST-101',
+        customerId: targetCustomerId,
         customerName: targetCustomerName,
         date: step2Date || purchaseDate || getTodayDateString(),
         companyName: productRows[0]?.companyName || productRows[0]?.brand || step2Company || 'SIMBA FW',
@@ -1143,6 +1514,16 @@ const PurchaseEntry = () => {
       // Increment bill number for next bill sequentially like 101001 -> 101002
       const nextBillNo = (parseInt(currentBillNo, 10) + 1 || 101002).toString();
       setStep2BillNo(nextBillNo);
+
+      // Reset product requirements & table rows so next order for this customer starts fresh!
+      setAddedRequiredProducts([]);
+      setProductRows([]);
+      setCustomerAdvanceInput('');
+      setReqEntryProduct('');
+      setReqEntryCases('');
+      setStep2Discount('');
+      setStep2Packing('');
+      setStep2Tax('');
 
       // Auto-navigate to Performo Details tab to show created bill
       setActiveTab('performo');
@@ -1181,7 +1562,7 @@ const PurchaseEntry = () => {
   };
 
   // Submit Add Credit / Payment Received
-  const handleAddCreditSubmit = (e) => {
+  const handleAddCreditSubmit = async (e) => {
     e.preventDefault();
     const amt = parseFloat(creditForm.amount) || 0;
     if (amt <= 0) {
@@ -1206,22 +1587,28 @@ const PurchaseEntry = () => {
     };
     setCreditEntries((prev) => [newCreditEntry, ...prev]);
 
+    const prevCredit = parseFloat(targetCustomer?.credit) || 0;
+    const prevDebit = parseFloat(targetCustomer?.debit) || 0;
+    const newCredit = prevCredit + amt;
+
     // Also record in Account Details ledger transactions
     const newCreditTxn = {
       id: `TXN-CRD-${Date.now()}`,
       customerId: targetCustomer?.id || 'CUST-101',
       customerName: creditForm.customerName || (targetCustomer ? targetCustomer.name : 'Customer'),
-      date: creditForm.date || '2026-09-17',
+      date: creditForm.date || getTodayDateString(),
       companyName: creditForm.companyName || 'SIMBA FW',
       debit: 0,
       credit: amt,
-      balance: Math.abs(((targetCustomer?.credit || 0) + amt) - (targetCustomer?.debit || 0)),
+      balance: Math.abs(newCredit - prevDebit),
     };
     setTransactions((prev) => [newCreditTxn, ...prev]);
 
     if (addAdvancePayment && targetCustomer) {
-      addAdvancePayment({
+      await addAdvancePayment({
         customerId: targetCustomer.id,
+        customerName: targetCustomer.name,
+        companyName: creditForm.companyName || 'SIMBA FW',
         amount: amt,
         date: creditForm.date || getTodayDateString(),
         paymentReference: creditForm.ref || `PAY-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -1229,18 +1616,24 @@ const PurchaseEntry = () => {
       });
     }
 
-    setCustomersList(
-      customersList.map((c) =>
+    setCustomersList((prev) =>
+      prev.map((c) =>
         c.name === creditForm.customerName || (targetCustomer && c.id === targetCustomer.id)
-          ? { ...c, credit: c.credit + amt }
+          ? { ...c, credit: newCredit }
           : c
       )
     );
 
+    if (updateCustomer && targetCustomer) {
+      await updateCustomer(targetCustomer.id || targetCustomer.mongoId, {
+        credit: newCredit,
+      });
+    }
+
     setCreditFeedback({
       type: 'success',
       message: `✅ Payment Credit of ${formatCurrency(amt)} Recorded Successfully!`,
-      details: `Customer: ${creditForm.customerName || targetCustomer?.name} | Company: ${creditForm.companyName} | Method: ${creditForm.paymentMethod} | Date: ${creditForm.date}`,
+      details: `Customer: ${creditForm.customerName || targetCustomer?.name} | New Total Credit: ${formatCurrency(newCredit)} | Method: ${creditForm.paymentMethod} | Date: ${creditForm.date}`,
     });
 
     setCreditForm({
@@ -1266,6 +1659,36 @@ const PurchaseEntry = () => {
           Performo billing, product allocation, customer account ledger, and credit entry
         </p>
       </div>
+
+      {/* ── Global Feedback Notification Banner ── */}
+      {feedback && (
+        <div
+          className={`p-4 rounded-xl border text-xs font-semibold flex items-center justify-between gap-3 shadow-sm transition-all ${feedback.type === 'success'
+            ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
+            : 'bg-rose-50 text-rose-900 border-rose-200'
+            }`}
+        >
+          <div className="flex items-center gap-2.5">
+            {feedback.type === 'success' ? (
+              <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
+            ) : (
+              <AlertTriangle size={18} className="text-rose-600 shrink-0" />
+            )}
+            <div>
+              <p className="font-bold">{feedback.message}</p>
+              {feedback.details && <p className="mt-0.5 text-[11px] opacity-90">{feedback.details}</p>}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setFeedback(null)}
+            className="p-1 hover:bg-black/5 rounded-lg text-slate-500 hover:text-slate-800 cursor-pointer"
+            title="Dismiss"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
 
       {/* ── Sub-Navigation Tabs inside Performo ── */}
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-3">
@@ -1552,8 +1975,105 @@ const PurchaseEntry = () => {
             </div>
           </section>
 
-          {/* ── PRODUCT REQUIRED SECTION (Single Entry Row + Added Items Below) ── */}
+          {/* ── OLD CUSTOMER REMAINING CASES TO SEND CARD ── */}
+          {activeCustomer && !isCurrentCustomerNew && totalPendingCasesToSend > 0 && (
+            <section className="bg-gradient-to-r from-amber-50 via-orange-50/40 to-amber-50 border-2 border-amber-300 rounded-2xl p-5 shadow-xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-200 pb-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-amber-500 text-white rounded-xl shadow-xs">
+                    <Truck size={22} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-base font-extrabold text-amber-950">
+                        Remaining Cases to Send to Customer
+                      </h3>
+                      <span className="px-2.5 py-0.5 bg-amber-600 text-white rounded-full text-xs font-black">
+                        {totalPendingCasesToSend} Cases Pending
+                      </span>
+                    </div>
+                    <p className="text-xs text-amber-800 font-semibold mt-0.5">
+                      {activeCustomer.name} has remaining cases waiting to be dispatched from previous bill(s).
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleLoadAllPendingCases}
+                  className="flex items-center gap-1.5 px-4 py-2.5 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer whitespace-nowrap self-start sm:self-auto"
+                  title="Load all pending cases into current requirement sheet"
+                >
+                  <Plus size={15} /> + Add All Pending Cases to Current Order
+                </button>
+              </div>
+
+              {/* Items Breakdown Table */}
+              <div className="border border-amber-200 rounded-xl overflow-x-auto bg-white shadow-2xs">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead className="bg-amber-100/70 border-b border-amber-200 text-amber-900 font-bold uppercase tracking-wider text-[11px]">
+                    <tr>
+                      <th className="py-2.5 px-3">Bill No / Date</th>
+                      <th className="py-2.5 px-3">Company</th>
+                      <th className="py-2.5 px-4">Product Name</th>
+                      <th className="py-2.5 px-3 text-center">Ordered</th>
+                      <th className="py-2.5 px-3 text-center">Sent</th>
+                      <th className="py-2.5 px-3 text-center font-black text-amber-900">Remaining to Send</th>
+                      <th className="py-2.5 px-3 text-center">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-amber-100">
+                    {customerPendingCasesList.map((item) => (
+                      <tr key={item.id} className="hover:bg-amber-50/50 transition-colors">
+                        <td className="py-2.5 px-3 font-mono font-bold text-slate-800 whitespace-nowrap">
+                          #{item.billNo} <span className="text-[10px] font-normal text-slate-500 font-sans">({item.date})</span>
+                        </td>
+                        <td className="py-2.5 px-3 font-bold text-slate-700 whitespace-nowrap">
+                          <span className="px-2 py-0.5 bg-slate-100 text-slate-800 rounded text-[11px] border border-slate-200">
+                            {item.companyName}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-4 font-black text-slate-900">
+                          {item.productName}
+                        </td>
+                        <td className="py-2.5 px-3 text-center font-bold text-slate-600 whitespace-nowrap">
+                          {item.caseRequired} Cases
+                        </td>
+                        <td className="py-2.5 px-3 text-center font-bold text-blue-700 whitespace-nowrap">
+                          {item.caseOut} Cases
+                        </td>
+                        <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-100 text-amber-900 border border-amber-300">
+                            {item.pendingCases} Cases Pending
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                          <button
+                            type="button"
+                            onClick={() => handleLoadSinglePendingCase(item)}
+                            className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white rounded-lg text-[11px] font-bold transition-all shadow-2xs cursor-pointer"
+                            title={`Load ${item.pendingCases} cases into current order`}
+                          >
+                            + Add to Order
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
+
+          {/* ── PRODUCT REQUIRED SECTION (Company First + Products Grouped Below) ── */}
           <section className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-6 space-y-5">
+            {/* Datalists for Company & Product Auto-suggestions */}
+            <datalist id="required-companies-datalist">
+              {allCompanyOptions.map((comp, idx) => (
+                <option key={idx} value={comp} />
+              ))}
+            </datalist>
+
             <datalist id="required-products-datalist">
               {allProductSuggestions.map((prodName, idx) => (
                 <option key={idx} value={prodName} />
@@ -1575,13 +2095,13 @@ const PurchaseEntry = () => {
                       </span>
                     </h2>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      Type product and cases in the entry row. Press <kbd className="px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded text-[10px] font-mono text-slate-700 font-bold">Enter</kbd> in the cases box to add directly below.
+                      Select/type company first at top. Then enter products and cases. Grouped like wholesale order sheets.
                     </p>
                   </div>
                 </div>
               </div>
 
-              {/* Header Action Buttons (Only Reset and Download PDF) */}
+              {/* Header Action Buttons (Reset and Download PDF) */}
               <div className="flex items-center gap-2">
                 {addedRequiredProducts.length > 0 && (
                   <button
@@ -1605,6 +2125,62 @@ const PurchaseEntry = () => {
               </div>
             </div>
 
+            {/* ── STEP 1.1: COMPANY FIRST AT TOP (TEXT BOX - NOT DROPDOWN) ── */}
+            <div className="bg-gradient-to-r from-blue-50/90 via-indigo-50/40 to-slate-50 border border-blue-200/90 rounded-xl p-4 shadow-2xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex-1">
+                  <label htmlFor="req-active-company-top" className="block text-xs font-extrabold text-slate-800 uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
+                    <Building2 size={15} className="text-blue-600" />
+                    <span>Company Selection (Type / Select Company First)</span>
+                    <span className="text-[10px] normal-case font-normal text-slate-500">(Text Box)</span>
+                  </label>
+                  <div className="relative max-w-lg">
+                    <input
+                      id="req-active-company-top"
+                      ref={reqCompanyInputRef}
+                      type="text"
+                      list="required-companies-datalist"
+                      placeholder="Type company name (e.g. J K PYRO TECH, EVAREST FW, SIMBA FW)..."
+                      value={reqActiveCompany}
+                      onChange={(e) => setReqActiveCompany(e.target.value)}
+                      onKeyDown={(e) => handleReqKeyDown(e, 'company')}
+                      className="w-full px-3.5 py-2.5 bg-white border border-slate-300 focus:border-blue-600 rounded-xl font-bold text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-xs shadow-2xs uppercase tracking-wide"
+                    />
+                    {reqActiveCompany && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setReqActiveCompany('');
+                          reqCompanyInputRef.current?.focus();
+                        }}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                        title="Clear Company"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Active Company Status Badge */}
+                <div className="flex items-center gap-2 self-start sm:self-center">
+                  {reqActiveCompany ? (
+                    <div className="flex items-center gap-2.5 px-3.5 py-2 bg-blue-100/90 border border-blue-300/80 rounded-xl shadow-2xs">
+                      <span className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse"></span>
+                      <div>
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-blue-700">Active Company</div>
+                        <div className="text-xs font-black text-blue-950 uppercase">{reqActiveCompany}</div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-[11px] text-slate-500 bg-white/80 border border-slate-200 px-3 py-2 rounded-xl">
+                      💡 Type company name above to add products under that company
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
             {/* Table: Row 1 is Entry Row, and added rows appear below */}
             <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs bg-white">
               <div className="overflow-x-auto">
@@ -1613,7 +2189,6 @@ const PurchaseEntry = () => {
                     <tr>
                       <th className="py-3 px-3.5 text-center w-24 text-slate-600">Product ID</th>
                       <th className="py-3 px-4">Customer Product Required</th>
-                      <th className="py-3 px-3 w-48 text-slate-600">Company (Optional)</th>
                       <th className="py-3 px-4 text-center w-40">Required Cases</th>
                       <th className="py-3 px-3 text-center w-28 text-slate-500">Action</th>
                     </tr>
@@ -1637,26 +2212,18 @@ const PurchaseEntry = () => {
                           ref={reqProdInputRef}
                           type="text"
                           list="required-products-datalist"
-                          placeholder={editingRequiredId ? 'Editing product name...' : 'Type or select product name (e.g. 20 SKY SHOT)...'}
+                          placeholder={
+                            editingRequiredId
+                              ? 'Editing product name...'
+                              : reqActiveCompany
+                                ? `Type product for ${reqActiveCompany} (e.g. 1000 WALA)...`
+                                : 'Type product name (e.g. 1000 WALA)...'
+                          }
                           value={reqEntryProduct}
                           onChange={(e) => setReqEntryProduct(e.target.value)}
                           onKeyDown={(e) => handleReqKeyDown(e, 'product')}
                           className="w-full px-3.5 py-2.5 bg-white border border-slate-300 focus:border-blue-600 rounded-xl font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all text-xs shadow-2xs"
                         />
-                      </td>
-                      <td className="py-2.5 px-3">
-                        <select
-                          value={reqEntryCompany}
-                          onChange={(e) => setReqEntryCompany(e.target.value)}
-                          className="w-full px-3 py-2.5 bg-white border border-slate-300 focus:border-blue-600 rounded-xl font-semibold text-slate-800 text-xs shadow-2xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 cursor-pointer"
-                        >
-                          <option value="">Select Company (Optional)</option>
-                          {allCompanyOptions.map((comp, idx) => (
-                            <option key={idx} value={comp}>
-                              {comp}
-                            </option>
-                          ))}
-                        </select>
                       </td>
                       <td className="py-2.5 px-3 text-center">
                         <input
@@ -1697,65 +2264,80 @@ const PurchaseEntry = () => {
                       </td>
                     </tr>
 
-                    {/* ── ADDED ITEMS LIST BELOW (kila add akitee varanum) ── */}
+                    {/* ── ADDED ITEMS LIST BELOW GROUPED BY COMPANY (Matching Cracker Wholesale Photo) ── */}
                     {addedRequiredProducts.length > 0 ? (
-                      addedRequiredProducts.map((item, index) => (
-                        <tr
-                          key={item.id}
-                          className={`hover:bg-slate-50/70 transition-colors ${editingRequiredId === item.id ? 'bg-amber-50/30 font-semibold' : ''
-                            }`}
-                        >
-                          <td className="py-3 px-3.5 text-center font-mono font-bold text-blue-700 text-xs">
-                            {item.productId || `${currentCustNum}-${String(index + 1).padStart(2, '0')}`}
-                          </td>
-                          <td className="py-3 px-4 font-semibold text-slate-900">
-                            {item.productName}
-                          </td>
-                          <td className="py-3 px-3">
-                            {item.companyName ? (
-                              <span className="inline-block px-2.5 py-1 bg-slate-100 text-slate-800 rounded-md font-semibold text-[11px] border border-slate-200">
-                                {item.companyName}
-                              </span>
-                            ) : (
-                              <span className="text-slate-400 text-xs italic">-</span>
-                            )}
-                          </td>
-                          <td className="py-3 px-4 text-center">
-                            <span className="inline-flex items-center px-3 py-1 rounded-md text-xs font-bold bg-blue-50 text-blue-700 border border-blue-100">
-                              {item.cases || 0} Cases
-                            </span>
-                          </td>
-                          <td className="py-3 px-3 text-center">
-                            <div className="flex items-center justify-center gap-1">
-                              {/* Edit option */}
-                              <button
-                                type="button"
-                                onClick={() => handleEditRequiredItem(item)}
-                                className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-                                title="Edit this item"
-                              >
-                                <Pencil size={15} />
-                              </button>
-                              {/* Delete option */}
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteRequiredItem(item.id)}
-                                className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                                title="Delete this item"
-                              >
-                                <Trash2 size={15} />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
+                      groupedRequiredProducts.map((group, gIdx) => (
+                        <React.Fragment key={`group-${group.displayTitle}-${gIdx}`}>
+                          {/* Company Header Row - Bold, Underlined matching photo */}
+                          <tr className="bg-slate-100/90 border-t-2 border-b border-slate-300">
+                            <td colSpan={4} className="py-2.5 px-4 bg-slate-100">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2.5">
+                                  <span className="font-extrabold text-slate-900 text-sm tracking-wider uppercase underline underline-offset-4 decoration-2 decoration-slate-900">
+                                    {group.displayTitle}
+                                  </span>
+                                  <span className="text-[11px] font-semibold text-slate-600 bg-white border border-slate-200 px-2.5 py-0.5 rounded-full">
+                                    {group.items.length} {group.items.length === 1 ? 'item' : 'items'}
+                                  </span>
+                                </div>
+                                <span className="text-xs font-bold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-md border border-blue-200/60">
+                                  Subtotal: {group.totalCases} Cases
+                                </span>
+                              </div>
+                            </td>
+                          </tr>
+
+                          {/* Products under this company */}
+                          {group.items.map((item) => (
+                            <tr
+                              key={item.id}
+                              className={`hover:bg-slate-50/70 transition-colors ${editingRequiredId === item.id ? 'bg-amber-50/30 font-semibold' : ''
+                                }`}
+                            >
+                              <td className="py-2.5 px-3.5 text-center font-mono font-bold text-blue-700 text-xs">
+                                {item.productId || `${currentCustNum}-${String(item.originalIndex + 1).padStart(2, '0')}`}
+                              </td>
+                              <td className="py-2.5 px-4 font-semibold text-slate-900 text-xs pl-6">
+                                {item.productName}
+                              </td>
+                              <td className="py-2.5 px-4 text-center">
+                                <span className="inline-flex items-center px-3 py-1 rounded-md text-xs font-bold bg-blue-50 text-blue-700 border border-blue-100">
+                                  {item.cases || 0} Cases
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-3 text-center">
+                                <div className="flex items-center justify-center gap-1">
+                                  {/* Edit option */}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleEditRequiredItem(item)}
+                                    className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                                    title="Edit this item"
+                                  >
+                                    <Pencil size={15} />
+                                  </button>
+                                  {/* Delete option */}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteRequiredItem(item.id)}
+                                    className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                    title="Delete this item"
+                                  >
+                                    <Trash2 size={15} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </React.Fragment>
                       ))
                     ) : (
                       <tr>
                         <td
-                          colSpan={5}
+                          colSpan={4}
                           className="py-6 text-center text-xs text-slate-400 font-medium bg-slate-50/40"
                         >
-                          No products added yet. Enter product name and cases above and press <kbd className="px-1.5 py-0.5 bg-white border border-slate-200 rounded font-mono text-[10px] text-slate-600">Enter</kbd> in the Cases box to add to this list.
+                          No products added yet. Enter company above, type product name and cases, and press <kbd className="px-1.5 py-0.5 bg-white border border-slate-200 rounded font-mono text-[10px] text-slate-600">Enter</kbd> to add.
                         </td>
                       </tr>
                     )}
@@ -1796,20 +2378,12 @@ const PurchaseEntry = () => {
                   <Download size={16} /> Download
                 </button>
 
-                {/* Proceed to Product Entry & Billing Setup Button (Next to Download, works only after customer & product entered) */}
+                {/* Proceed to Product Entry & Billing Setup Button (Always works and navigates smoothly) */}
                 <button
                   type="button"
                   onClick={handleProceedToBilling}
-                  disabled={addedRequiredProducts.length === 0}
-                  className={`px-5 py-2.5 font-bold text-xs rounded-xl transition-all flex items-center gap-2 shadow-sm ${addedRequiredProducts.length > 0
-                    ? 'bg-blue-600 hover:bg-blue-700 active:scale-95 text-white shadow-blue-600/25 cursor-pointer'
-                    : 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-80'
-                    }`}
-                  title={
-                    addedRequiredProducts.length > 0
-                      ? 'Proceed to Product Entry & Billing Setup'
-                      : 'Please select customer and enter at least one product requirement to proceed'
-                  }
+                  className="px-5 py-2.5 font-bold text-xs rounded-xl transition-all flex items-center gap-2 shadow-sm bg-blue-600 hover:bg-blue-700 active:scale-95 text-white shadow-blue-600/25 cursor-pointer"
+                  title="Proceed to Product Entry & Billing Setup"
                 >
                   Proceed to Product Entry & Billing Setup →
                 </button>
@@ -1848,7 +2422,7 @@ const PurchaseEntry = () => {
                 Customer Account
               </p>
               <p className="text-sm font-black text-slate-900 mt-0.5 truncate">
-                {activeCustomer ? activeCustomer.name : 'SAI MOHAN MARKETING'}
+                {activeCustomer ? activeCustomer.name : 'No Customer Selected'}
               </p>
               <p className="text-[11px] text-slate-500 font-semibold mt-0.5">
                 Phone: {activeCustomer ? activeCustomer.phone : 'N/A'}
@@ -1900,6 +2474,30 @@ const PurchaseEntry = () => {
               </p>
             </div>
           </div>
+
+          {/* Pending Cases Notification Banner in Tab 2 */}
+          {activeCustomer && totalPendingCasesToSend > 0 && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300 rounded-xl text-xs text-amber-900 shadow-2xs">
+              <div className="flex items-center gap-2.5">
+                <Truck size={18} className="text-amber-600 shrink-0" />
+                <span>
+                  <strong>Reminder:</strong> <strong className="font-extrabold text-amber-950">{activeCustomer.name}</strong> has{' '}
+                  <span className="inline-block px-2 py-0.5 bg-amber-200/80 border border-amber-300 rounded-md font-black text-amber-950">
+                    {totalPendingCasesToSend} Cases
+                  </span>{' '}
+                  remaining to send from previous bills.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={handleLoadAllPendingCases}
+                className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-bold rounded-lg text-xs transition-all shadow-2xs cursor-pointer whitespace-nowrap self-start sm:self-auto"
+                title="Include these remaining cases in the current order requirements"
+              >
+                + Include All Pending Cases in Order
+              </button>
+            </div>
+          )}
 
           {/* ── Product Table with Inline Editable Inputs ── */}
           <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs bg-white">
@@ -2079,7 +2677,16 @@ const PurchaseEntry = () => {
                   <div className="relative">
                     <select
                       value={step2Customer}
-                      onChange={(e) => setStep2Customer(e.target.value)}
+                      onChange={(e) => {
+                        const custName = e.target.value;
+                        setStep2Customer(custName);
+                        const matched = customersList.find((c) => c.name === custName);
+                        if (matched) {
+                          setSelectedCustomerId(matched.id);
+                        } else {
+                          setSelectedCustomerId('');
+                        }
+                      }}
                       className="w-full pl-3 pr-8 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 cursor-pointer shadow-2xs appearance-none"
                     >
                       <option value="">Select Customer</option>
@@ -2249,8 +2856,15 @@ const PurchaseEntry = () => {
                     <span className="font-bold text-rose-600">- {formatCurrency(discountAmount)}</span>
                   </div>
 
+                  {discountVal > 0 && (
+                    <div className="flex justify-between text-slate-700 font-bold bg-slate-50 px-2 py-1 rounded">
+                      <span>Net Total (After Disc):</span>
+                      <span className="font-black text-slate-900">{formatCurrency(netTotalAfterDiscount)}</span>
+                    </div>
+                  )}
+
                   <div className="flex justify-between text-slate-600 font-medium">
-                    <span>Packing ({packingVal}%):</span>
+                    <span>Packing ({packingVal}% on Net):</span>
                     <span className="font-bold text-slate-800">+ {formatCurrency(packingAmount)}</span>
                   </div>
 
@@ -2320,86 +2934,203 @@ const PurchaseEntry = () => {
       {/* ========================================================================= */}
       {activeTab === 'account' && (
         <section className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-6 space-y-5">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2.5">
-              <User size={20} className="text-blue-600" />
-              Account Details
-            </h2>
-            <span className="text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1 rounded-full">
-              {activeCustomer ? activeCustomer.name : 'Selected Customer'}
-            </span>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2.5">
+                <User size={20} className="text-blue-600" />
+                Account Details
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {activeCustomer ? `Purchase billing records & account summary for ${activeCustomer.name}` : 'Please select a customer to view account details'}
+              </p>
+            </div>
+            {activeCustomer && (
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <span className="text-xs font-bold text-slate-700 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200/70">
+                  {activeCustomer.name} ({customerPurchaseDetails.length} {customerPurchaseDetails.length === 1 ? 'Bill' : 'Bills'})
+                </span>
+                <button
+                  type="button"
+                  onClick={handleStartNextOrder}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer active:scale-95"
+                  title="Start a new order / next bill for this customer"
+                >
+                  <Plus size={14} /> Next Order / New Bill
+                </button>
+              </div>
+            )}
           </div>
 
-          {/* Selected Customer Transaction Table */}
-          <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead className="bg-slate-100 border-b border-slate-200">
-                <tr>
-                  <th className="py-3 px-4 font-bold text-slate-700 uppercase">SL.NO</th>
-                  <th className="py-3 px-4 font-bold text-slate-700 uppercase">DATE</th>
-                  <th className="py-3 px-4 font-bold text-slate-700 uppercase">CUSTOMER</th>
-                  <th className="py-3 px-4 font-bold text-slate-700 uppercase">COMPANY NAME</th>
-                  <th className="py-3 px-4 font-bold text-slate-700 uppercase">DEBIT</th>
-                  <th className="py-3 px-4 font-bold text-slate-700 uppercase">CREDIT</th>
-                  <th className="py-3 px-4 font-bold text-slate-700 uppercase">BALANCE</th>
-                  <th className="py-3 px-4 font-bold text-slate-700 uppercase text-center">ACTION</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200 bg-white">
-                {customerTransactionsList.map((trx, index) => (
-                  <tr key={trx.id || index} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="py-3.5 px-4 font-bold text-slate-600">
-                      {index + 1}
-                    </td>
-                    <td className="py-3.5 px-4 font-semibold text-slate-800">
-                      {trx.date}
-                    </td>
-                    <td className="py-3.5 px-4 font-bold text-slate-900">
-                      {trx.customerName || (activeCustomer ? activeCustomer.name : '-')}
-                    </td>
-                    <td className="py-3.5 px-4 font-semibold text-slate-700">
-                      {trx.companyName || 'SIMBA FW'}
-                    </td>
-                    <td className="py-3.5 px-4 font-bold text-slate-900">
-                      {trx.debit > 0 ? formatCurrency(trx.debit) : '-'}
-                    </td>
-                    <td className="py-3.5 px-4 font-bold text-emerald-600">
-                      {trx.credit > 0 ? formatCurrency(trx.credit) : '-'}
-                    </td>
-                    <td className="py-3.5 px-4 font-bold text-slate-900">
-                      {formatCurrency(Math.abs(trx.balance || 0))}
-                    </td>
-                    <td className="py-3.5 px-4 text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        <button
-                          onClick={() => handleEditTransaction(trx)}
-                          className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-                          title="Edit Transaction"
-                        >
-                          <Pencil size={15} />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteTransaction(trx.id)}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                          title="Delete Transaction"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
+          {/* Customer Selection Toolbar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 border border-slate-200 rounded-xl p-3.5 shadow-2xs">
+            <div className="flex items-center gap-2.5 flex-1">
+              <User size={16} className="text-blue-600 shrink-0" />
+              <label className="text-xs font-bold text-slate-700 whitespace-nowrap">Filter Customer:</label>
+              <select
+                value={selectedCustomerId || (activeCustomer ? activeCustomer.id : '')}
+                onChange={(e) => {
+                  const id = e.target.value;
+                  setSelectedCustomerId(id);
+                  const cust = customersList.find((c) => c.id === id);
+                  if (cust) {
+                    setStep2Customer(cust.name);
+                  } else {
+                    setStep2Customer('');
+                  }
+                }}
+                className="w-full max-w-sm px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-2xs"
+              >
+                <option value="">Select Customer Account...</option>
+                {customersList.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} ({c.customId || c.id})
+                  </option>
                 ))}
+              </select>
+            </div>
 
-                {customerTransactionsList.length === 0 && (
-                  <tr>
-                    <td colSpan="8" className="text-center py-8 text-slate-400 font-medium">
-                      No transactions found for {activeCustomer ? activeCustomer.name : 'this customer'}.
-                    </td>
-                  </tr>
+            {activeCustomer && (
+              <div className="flex items-center gap-3 text-xs flex-wrap">
+                <span className="text-slate-500">Phone: <strong className="text-slate-800">{activeCustomer.phone}</strong></span>
+                <span className="text-slate-300">•</span>
+                <span className="text-slate-500">Current Balance: <strong className={customerPreviousRemaining < 0 ? 'text-rose-600' : 'text-emerald-700'}>{formatCurrency(customerPreviousRemaining)}</strong></span>
+                {totalPendingCasesToSend > 0 && (
+                  <>
+                    <span className="text-slate-300">•</span>
+                    <span className="text-amber-800 font-bold bg-amber-100 border border-amber-300 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                      <Truck size={12} />
+                      Pending Cases: {totalPendingCasesToSend}
+                    </span>
+                  </>
                 )}
-              </tbody>
-            </table>
+              </div>
+            )}
           </div>
+
+          {!activeCustomer ? (
+            <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl p-10 text-center space-y-3">
+              <User size={36} className="mx-auto text-slate-400" />
+              <h3 className="text-sm font-bold text-slate-800">No Customer Account Selected</h3>
+              <p className="text-xs text-slate-500 max-w-md mx-auto">
+                Please select a customer from the dropdown above to view that particular customer&apos;s purchase history and account details.
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* If customer has remaining cases to send, display pending breakdown */}
+              {totalPendingCasesToSend > 0 && (
+                <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300 rounded-xl p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <Truck size={18} className="text-amber-600" />
+                      <h4 className="text-xs font-black text-amber-950 uppercase tracking-wide">
+                        Pending Cases to Send ({totalPendingCasesToSend} Cases Total)
+                      </h4>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleLoadAllPendingCases();
+                        setActiveTab('customer');
+                      }}
+                      className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer"
+                    >
+                      + Add to New Order Sheet
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                    {customerPendingCasesList.map((item) => (
+                      <div key={item.id} className="bg-white border border-amber-200 rounded-lg p-2.5 text-xs shadow-2xs">
+                        <div className="flex items-center justify-between font-bold text-slate-900">
+                          <span className="truncate">{item.productName}</span>
+                          <span className="text-amber-800 font-black">{item.pendingCases} Cases</span>
+                        </div>
+                        <div className="text-[11px] text-slate-500 mt-0.5 flex justify-between">
+                          <span>{item.companyName}</span>
+                          <span>Bill #{item.billNo}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Selected Customer Purchase History Table */}
+              <div className="border border-slate-200 rounded-xl overflow-x-auto shadow-2xs">
+                <table className="w-full text-left text-xs border-collapse min-w-[800px]">
+                  <thead className="bg-slate-100 border-b border-slate-200">
+                    <tr>
+                      <th className="py-3 px-4 font-bold text-slate-700 uppercase whitespace-nowrap">SL.NO</th>
+                      <th className="py-3 px-4 font-bold text-slate-700 uppercase whitespace-nowrap">BILL NO</th>
+                      <th className="py-3 px-4 font-bold text-slate-700 uppercase whitespace-nowrap">DATE</th>
+                      <th className="py-3 px-4 font-bold text-slate-700 uppercase whitespace-nowrap">CUSTOMER</th>
+                      <th className="py-3 px-4 font-bold text-slate-700 uppercase whitespace-nowrap">COMPANY NAME</th>
+                      <th className="py-3 px-4 font-bold text-slate-700 uppercase whitespace-nowrap">DEBIT</th>
+                      <th className="py-3 px-4 font-bold text-slate-700 uppercase whitespace-nowrap">CREDIT</th>
+                      <th className="py-3 px-4 font-bold text-slate-700 uppercase whitespace-nowrap">BALANCE</th>
+                      <th className="py-3 px-4 font-bold text-slate-700 uppercase text-center whitespace-nowrap">ACTION</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 bg-white">
+                    {customerPurchaseDetails.map((bill, index) => (
+                      <tr key={bill.id || index} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-3.5 px-4 font-bold text-slate-600 whitespace-nowrap">
+                          {index + 1}
+                        </td>
+                        <td className="py-3.5 px-4 font-mono font-bold text-blue-600 whitespace-nowrap">
+                          #{bill.billNo}
+                        </td>
+                        <td className="py-3.5 px-4 font-semibold text-slate-800 whitespace-nowrap">
+                          {bill.date}
+                        </td>
+                        <td className="py-3.5 px-4 font-bold text-slate-900 whitespace-nowrap">
+                          {bill.customerName}
+                        </td>
+                        <td className="py-3.5 px-4 font-semibold text-slate-700 whitespace-nowrap">
+                          {bill.companyName}
+                        </td>
+                        <td className="py-3.5 px-4 font-bold text-slate-900 whitespace-nowrap">
+                          {bill.debit > 0 ? formatCurrency(bill.debit) : '-'}
+                        </td>
+                        <td className="py-3.5 px-4 font-bold text-emerald-600 whitespace-nowrap">
+                          {bill.credit > 0 ? formatCurrency(bill.credit) : '-'}
+                        </td>
+                        <td className="py-3.5 px-4 font-bold text-slate-900 whitespace-nowrap">
+                          {formatCurrency(Math.abs(bill.balance || 0))}
+                        </td>
+                        <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              onClick={() => handleEditPerformoBill(bill.rawBill || bill)}
+                              className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                              title="Edit Bill"
+                            >
+                              <Pencil size={15} />
+                            </button>
+                            <button
+                              onClick={() => handleDeletePerformoBill(bill.id)}
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                              title="Delete Bill"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+
+                    {customerPurchaseDetails.length === 0 && (
+                      <tr>
+                        <td colSpan="9" className="text-center py-8 text-slate-400 font-medium">
+                          No purchase records found for {activeCustomer.name}.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </section>
       )}
 
@@ -2409,101 +3140,174 @@ const PurchaseEntry = () => {
       {activeTab === 'performo' && (
         <section className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-6 space-y-5">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2.5">
-              <FileSpreadsheet size={20} className="text-blue-600" />
-              Performo Details
-            </h2>
-            <span className="text-xs font-bold text-blue-700 bg-blue-50 px-3 py-1 rounded-full">
-              {activeCustomer ? activeCustomer.name : 'Selected Customer'} ({customerPerformoBills.length} Bills)
-            </span>
+            <div>
+              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2.5">
+                <FileSpreadsheet size={20} className="text-blue-600" />
+                Performo Details
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {activeCustomer ? `Performo billing records for ${activeCustomer.name}` : 'Please select a customer to view performo bills'}
+              </p>
+            </div>
+            {activeCustomer && (
+              <span className="text-xs font-bold text-blue-700 bg-blue-50 px-3 py-1 rounded-full border border-blue-200">
+                {activeCustomer.name} ({customerPerformoBills.length} Bills)
+              </span>
+            )}
           </div>
 
-          {/* Selected Customer Performo Bills Detailed Table */}
-          <div className="border border-slate-200 rounded-xl overflow-x-auto shadow-2xs">
-            <table className="w-full text-left text-xs border-collapse min-w-[950px]">
-              <thead className="bg-slate-100 border-b border-slate-200">
-                <tr>
-                  <th className="py-3 px-4 font-bold text-slate-700 uppercase whitespace-nowrap">BILL.NO</th>
-                  <th className="py-3 px-4 font-bold text-slate-700 uppercase whitespace-nowrap">CUSTOMER</th>
-                  <th className="py-3 px-4 font-bold text-slate-700 uppercase whitespace-nowrap">COMPANY NAME</th>
-                  <th className="py-3 px-4 font-bold text-slate-700 uppercase whitespace-nowrap">DATE</th>
-                  <th className="py-3 px-4 font-bold text-slate-700 uppercase whitespace-nowrap">SUBTOTAL</th>
-                  <th className="py-3 px-4 font-bold text-slate-700 uppercase whitespace-nowrap">DISCOUNT</th>
-                  <th className="py-3 px-4 font-bold text-slate-700 uppercase whitespace-nowrap">PACKING</th>
-                  <th className="py-3 px-4 font-bold text-slate-700 uppercase whitespace-nowrap">TAX</th>
-                  <th className="py-3 px-4 font-bold text-slate-700 uppercase whitespace-nowrap">NET TOTAL</th>
-                  <th className="py-3 px-4 font-bold text-slate-700 uppercase text-center whitespace-nowrap">ACTION</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200 bg-white">
-                {customerPerformoBills.map((bill, index) => (
-                  <tr key={bill.id || index} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="py-3.5 px-4 font-mono font-bold text-blue-600 whitespace-nowrap">
-                      #{bill.billNo}
-                    </td>
-                    <td className="py-3.5 px-4 font-bold text-slate-900 whitespace-nowrap">
-                      {bill.customer}
-                    </td>
-                    <td className="py-3.5 px-4 font-semibold text-slate-700 whitespace-nowrap">
-                      {bill.companyName || 'SIMBA FW'}
-                    </td>
-                    <td className="py-3.5 px-4 font-semibold text-slate-600 whitespace-nowrap">
-                      {bill.date}
-                    </td>
-                    <td className="py-3.5 px-4 font-bold text-slate-900 whitespace-nowrap">
-                      {formatCurrency(bill.subtotal || bill.debit || 0)}
-                    </td>
-                    <td className="py-3.5 px-4 font-semibold text-rose-600 whitespace-nowrap">
-                      {bill.discount > 0 ? formatCurrency(bill.discount) : '-'}
-                    </td>
-                    <td className="py-3.5 px-4 font-semibold text-slate-700 whitespace-nowrap">
-                      {bill.packing > 0 ? formatCurrency(bill.packing) : '-'}
-                    </td>
-                    <td className="py-3.5 px-4 font-semibold text-slate-700 whitespace-nowrap">
-                      {bill.tax > 0 ? formatCurrency(bill.tax) : '-'}
-                    </td>
-                    <td className="py-3.5 px-4 font-extrabold text-blue-700 whitespace-nowrap">
-                      {formatCurrency(bill.netTotal || bill.debit || 0)}
-                    </td>
-                    <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                      <div className="flex items-center justify-center gap-2">
-                        <button
-                          onClick={() => handleViewCustomerStatement(bill.customer)}
-                          className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold border border-blue-200 rounded-lg transition-all cursor-pointer flex items-center gap-1 text-[11px]"
-                          title="View Account Details Statement"
-                        >
-                          <FileText size={13} />
-                          <span>Statement</span>
-                        </button>
-                        <button
-                          onClick={() => handleEditPerformoBill(bill)}
-                          className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-                          title="Edit Bill"
-                        >
-                          <Pencil size={15} />
-                        </button>
-                        <button
-                          onClick={() => handleDeletePerformoBill(bill.id)}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                          title="Delete Bill"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
+          {/* Customer Selection Toolbar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 border border-slate-200 rounded-xl p-3.5 shadow-2xs">
+            <div className="flex items-center gap-2.5 flex-1">
+              <User size={16} className="text-blue-600 shrink-0" />
+              <label className="text-xs font-bold text-slate-700 whitespace-nowrap">Filter Customer:</label>
+              <select
+                value={selectedCustomerId || (activeCustomer ? activeCustomer.id : '')}
+                onChange={(e) => {
+                  const id = e.target.value;
+                  setSelectedCustomerId(id);
+                  const cust = customersList.find((c) => c.id === id);
+                  if (cust) {
+                    setStep2Customer(cust.name);
+                  } else {
+                    setStep2Customer('');
+                  }
+                }}
+                className="w-full max-w-sm px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-2xs"
+              >
+                <option value="">Select Customer Account...</option>
+                {customersList.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} ({c.customId || c.id})
+                  </option>
                 ))}
+              </select>
+            </div>
 
-                {customerPerformoBills.length === 0 && (
-                  <tr>
-                    <td colSpan="10" className="text-center py-8 text-slate-400 font-medium">
-                      No Performo bills found for {activeCustomer ? activeCustomer.name : 'this customer'}.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+            {activeCustomer && (
+              <div className="flex items-center gap-3 text-xs flex-wrap">
+                <span className="text-slate-500">Customer: <strong className="text-slate-800">{activeCustomer.name}</strong></span>
+                <span className="text-slate-300">•</span>
+                <span className="text-slate-500">Bills Count: <strong className="text-blue-600">{customerPerformoBills.length}</strong></span>
+              </div>
+            )}
           </div>
+
+          {!activeCustomer ? (
+            <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl p-10 text-center space-y-3">
+              <FileSpreadsheet size={36} className="mx-auto text-slate-400" />
+              <h3 className="text-sm font-bold text-slate-800">No Customer Account Selected</h3>
+              <p className="text-xs text-slate-500 max-w-md mx-auto">
+                Please select a customer account from the dropdown above to view that particular customer&apos;s Performo Bills.
+              </p>
+            </div>
+          ) : (
+            /* Selected Customer Performo Bills Detailed Table */
+            <div className="border border-slate-200 rounded-xl overflow-x-auto shadow-2xs">
+              <table className="w-full text-left text-xs border-collapse min-w-[950px]">
+                <thead className="bg-slate-100 border-b border-slate-200">
+                  <tr>
+                    <th className="py-3 px-4 font-bold text-slate-700 uppercase whitespace-nowrap">BILL.NO</th>
+                    <th className="py-3 px-4 font-bold text-slate-700 uppercase whitespace-nowrap">CUSTOMER</th>
+                    <th className="py-3 px-4 font-bold text-slate-700 uppercase whitespace-nowrap">COMPANY NAME</th>
+                    <th className="py-3 px-4 font-bold text-slate-700 uppercase whitespace-nowrap">DATE</th>
+                    <th className="py-3 px-4 font-bold text-slate-700 uppercase whitespace-nowrap">CASES STATUS</th>
+                    <th className="py-3 px-4 font-bold text-slate-700 uppercase whitespace-nowrap">SUBTOTAL</th>
+                    <th className="py-3 px-4 font-bold text-slate-700 uppercase whitespace-nowrap">DISCOUNT</th>
+                    <th className="py-3 px-4 font-bold text-slate-700 uppercase whitespace-nowrap">PACKING</th>
+                    <th className="py-3 px-4 font-bold text-slate-700 uppercase whitespace-nowrap">TAX</th>
+                    <th className="py-3 px-4 font-bold text-slate-700 uppercase whitespace-nowrap">NET TOTAL</th>
+                    <th className="py-3 px-4 font-bold text-slate-700 uppercase text-center whitespace-nowrap">ACTION</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 bg-white">
+                  {customerPerformoBills.map((bill, index) => {
+                    const billItems = bill.items || [];
+                    const billReq = billItems.reduce((s, it) => s + (parseFloat(it.caseRequired || it.caseCount) || 0), 0);
+                    const billOut = billItems.reduce((s, it) => s + (parseFloat(it.caseOut || it.dispatchedCases) || 0), 0);
+                    const billPending = Math.max(0, billReq - billOut);
+
+                    return (
+                      <tr key={bill.id || index} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-3.5 px-4 font-mono font-bold text-blue-600 whitespace-nowrap">
+                          #{bill.billNo}
+                        </td>
+                        <td className="py-3.5 px-4 font-bold text-slate-900 whitespace-nowrap">
+                          {bill.customer}
+                        </td>
+                        <td className="py-3.5 px-4 font-semibold text-slate-700 whitespace-nowrap">
+                          {bill.companyName || 'SIMBA FW'}
+                        </td>
+                        <td className="py-3.5 px-4 font-semibold text-slate-600 whitespace-nowrap">
+                          {bill.date}
+                        </td>
+                        <td className="py-3.5 px-4 whitespace-nowrap">
+                          {billPending > 0 ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                              {billPending} Cases Pending
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              All Dispatched
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-4 font-bold text-slate-900 whitespace-nowrap">
+                          {formatCurrency(bill.subtotal || bill.debit || 0)}
+                        </td>
+                        <td className="py-3.5 px-4 font-semibold text-rose-600 whitespace-nowrap">
+                          {bill.discount > 0 ? formatCurrency(bill.discount) : '-'}
+                        </td>
+                        <td className="py-3.5 px-4 font-semibold text-slate-700 whitespace-nowrap">
+                          {bill.packing > 0 ? formatCurrency(bill.packing) : '-'}
+                        </td>
+                        <td className="py-3.5 px-4 font-semibold text-slate-700 whitespace-nowrap">
+                          {bill.tax > 0 ? formatCurrency(bill.tax) : '-'}
+                        </td>
+                        <td className="py-3.5 px-4 font-extrabold text-blue-700 whitespace-nowrap">
+                          {formatCurrency(bill.netTotal || bill.debit || 0)}
+                        </td>
+                        <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              onClick={() => handleViewCustomerStatement(bill.customer)}
+                              className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold border border-blue-200 rounded-lg transition-all cursor-pointer flex items-center gap-1 text-[11px]"
+                              title="View Account Details Statement"
+                            >
+                              <FileText size={13} />
+                              <span>Statement</span>
+                            </button>
+                            <button
+                              onClick={() => handleEditPerformoBill(bill)}
+                              className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                              title="Edit Bill"
+                            >
+                              <Pencil size={15} />
+                            </button>
+                            <button
+                              onClick={() => handleDeletePerformoBill(bill.id)}
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                              title="Delete Bill"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+
+                  {customerPerformoBills.length === 0 && (
+                    <tr>
+                      <td colSpan="11" className="text-center py-8 text-slate-400 font-medium">
+                        No Performo bills found for {activeCustomer.name}.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
         </section>
       )}
 
