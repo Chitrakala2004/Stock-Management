@@ -112,28 +112,28 @@ const Dashboard = ({ setActivePage }) => {
   return (
     <div className="space-y-6">
       {/* Welcome Banner */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-6 shadow-xl relative overflow-hidden">
-        <div className="flex items-center justify-between relative z-10">
+      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-4 sm:p-6 shadow-xl relative overflow-hidden">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-full text-xs font-semibold mb-2">
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-full text-[11px] sm:text-xs font-semibold mb-2">
               💥 Crackers Stock & Advance Deduction Management
             </div>
-            <h2 className="text-2xl font-bold">Admin Control Center</h2>
+            <h2 className="text-xl sm:text-2xl font-bold">Admin Control Center</h2>
             <p className="text-xs text-slate-300 mt-1 max-w-xl">
               Record advance payments, add brands & products with pieces-per-case specifications, build multi-product purchase cart allocations, and automatically deduct stock & advance balances.
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
             <button
               onClick={() => setActivePage('Purchase Entry')}
-              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-semibold text-xs rounded-xl shadow-lg transition-all cursor-pointer"
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-semibold text-xs rounded-xl shadow-lg transition-all cursor-pointer"
             >
               <PlusCircle size={15} />
               New Purchase Entry
             </button>
             <button
               onClick={() => setActivePage('Advance Payments')}
-              className="flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white font-semibold text-xs rounded-xl backdrop-blur-sm border border-white/10 transition-all cursor-pointer"
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 bg-white/10 hover:bg-white/20 text-white font-semibold text-xs rounded-xl backdrop-blur-sm border border-white/10 transition-all cursor-pointer"
             >
               <Wallet size={15} />
               Record Advance
@@ -144,29 +144,29 @@ const Dashboard = ({ setActivePage }) => {
 
       {/* ── 8 Dashboard Cards Grid ── */}
       <div>
-        <h3 className="text-sm font-bold text-gray-800 uppercase tracking-wider mb-3">
+        <h3 className="text-xs sm:text-sm font-bold text-gray-800 uppercase tracking-wider mb-3">
           Business & Inventory Metrics
         </h3>
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           {cards.map((card) => {
             const Icon = card.icon;
             return (
               <div
                 key={card.title}
                 onClick={() => setActivePage(card.actionPage)}
-                className="bg-white rounded-2xl p-5 border border-gray-100 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 cursor-pointer group"
+                className="bg-white rounded-2xl p-4 sm:p-5 border border-gray-100 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 cursor-pointer group"
               >
                 <div className="flex items-center justify-between mb-3">
                   <div
-                    className={`w-11 h-11 ${card.bgColor} rounded-xl flex items-center justify-center text-white shadow-md ${card.shadowColor} group-hover:scale-110 transition-transform`}
+                    className={`w-10 h-10 sm:w-11 sm:h-11 ${card.bgColor} rounded-xl flex items-center justify-center text-white shadow-md ${card.shadowColor} group-hover:scale-110 transition-transform`}
                   >
-                    <Icon size={20} />
+                    <Icon size={18} />
                   </div>
                   <span className="text-xs text-gray-400 group-hover:text-blue-600 font-medium flex items-center gap-0.5">
                     View <ArrowRight size={12} />
                   </span>
                 </div>
-                <h4 className="text-2xl font-extrabold text-gray-900 leading-tight">{card.value}</h4>
+                <h4 className="text-xl sm:text-2xl font-extrabold text-gray-900 leading-tight">{card.value}</h4>
                 <p className="text-xs font-semibold text-gray-600 mt-1">{card.title}</p>
                 <p className="text-[11px] text-gray-400 mt-0.5">{card.subtitle}</p>
               </div>
@@ -176,11 +176,11 @@ const Dashboard = ({ setActivePage }) => {
       </div>
 
       {/* ── Quick Action Shortcuts & Recent Logs ── */}
-      <div className="grid grid-cols-12 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         {/* Recent Purchases */}
-        <div className="col-span-7 bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+        <div className="col-span-1 lg:col-span-7 bg-white rounded-2xl p-4 sm:p-6 border border-gray-100 shadow-sm">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-bold text-gray-900 text-base">Recent Stock Allocations</h3>
+            <h3 className="font-bold text-gray-900 text-sm sm:text-base">Recent Stock Allocations</h3>
             <button
               onClick={() => setActivePage('Purchase History')}
               className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
@@ -228,7 +228,7 @@ const Dashboard = ({ setActivePage }) => {
         </div>
 
         {/* Low Stock Crackers List */}
-        <div className="col-span-5 bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+        <div className="col-span-1 lg:col-span-5 bg-white rounded-2xl p-4 sm:p-6 border border-gray-100 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-bold text-gray-900 text-base">Low Stock Crackers</h3>
             <span className="text-xs font-semibold text-rose-600 bg-rose-50 px-2.5 py-1 rounded-full">

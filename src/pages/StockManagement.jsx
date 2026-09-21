@@ -146,26 +146,26 @@ const StockManagement = () => {
   return (
     <div className="space-y-6">
       {/* ── Summary Cards ── */}
-      <div className="grid grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="bg-white rounded-xl p-4 sm:p-5 border border-gray-200 shadow-sm">
           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Crackers Items</p>
           <p className="text-2xl font-black text-slate-900">{filteredProducts.length}</p>
           <p className="text-xs text-gray-500 mt-1">{brands.length} Active Brands</p>
         </div>
 
-        <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
+        <div className="bg-white rounded-xl p-4 sm:p-5 border border-gray-200 shadow-sm">
           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Stock Cases Quantity</p>
           <p className="text-2xl font-black text-blue-600">{totalCases.toLocaleString('en-IN')} Cases</p>
           <p className="text-xs text-blue-700 mt-1 font-medium">{totalPieces.toLocaleString('en-IN')} Total Pieces</p>
         </div>
 
-        <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
+        <div className="bg-white rounded-xl p-4 sm:p-5 border border-gray-200 shadow-sm">
           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Stock Value</p>
           <p className="text-2xl font-black text-emerald-600">₹{totalStockValue.toLocaleString('en-IN')}</p>
           <p className="text-xs text-emerald-700 mt-1 font-medium">Auto-calculated valuation</p>
         </div>
 
-        <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm flex flex-col justify-center">
+        <div className="bg-white rounded-xl p-4 sm:p-5 border border-gray-200 shadow-sm flex flex-col justify-center">
           <div className="flex items-center gap-2">
             <button
               onClick={() => setIsAddBrandOpen(true)}
@@ -184,23 +184,23 @@ const StockManagement = () => {
       </div>
 
       {/* ── Main Inventory Section ── */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-        <div className="flex items-center justify-between mb-5">
+      <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-5 shadow-sm">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-5">
           <div>
             <h3 className="font-bold text-gray-900 text-base">Admin Crackers Inventory Management</h3>
             <p className="text-xs text-gray-400">Specify Pieces Per Case & Price Per Piece for precise automated stock & purchase deductions</p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 w-full lg:w-auto">
             {/* Search */}
-            <div className="relative">
+            <div className="relative flex-1 sm:flex-initial min-w-[180px]">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
                 placeholder="Search brand, product..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-56 pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full sm:w-56 pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
 
@@ -208,7 +208,7 @@ const StockManagement = () => {
             <select
               value={selectedBrandFilter}
               onChange={(e) => setSelectedBrandFilter(e.target.value)}
-              className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-700 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+              className="flex-1 sm:flex-initial px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-700 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
             >
               <option value="All">All Brands ({brands.length})</option>
               {brands.map((b) => {
@@ -223,7 +223,7 @@ const StockManagement = () => {
             <select
               value={selectedCategoryFilter}
               onChange={(e) => setSelectedCategoryFilter(e.target.value)}
-              className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-700 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+              className="flex-1 sm:flex-initial px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-700 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
             >
               <option value="All">All Categories</option>
               {categoriesList.map((c) => (
@@ -235,7 +235,7 @@ const StockManagement = () => {
             <select
               value={stockStatusFilter}
               onChange={(e) => setStockStatusFilter(e.target.value)}
-              className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-700 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+              className="flex-1 sm:flex-initial px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-700 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
             >
               <option value="All">All Statuses</option>
               <option value="In Stock">In Stock</option>
@@ -393,7 +393,7 @@ const StockManagement = () => {
           title="Add Crackers Product Under Brand"
         >
           <form onSubmit={handleAddProductSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
                 <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
                   Brand Name <span className="text-red-500">*</span>
@@ -445,7 +445,7 @@ const StockManagement = () => {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
                 <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
                   Price Per Piece (₹) <span className="text-red-500">*</span>
@@ -479,7 +479,7 @@ const StockManagement = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
                 <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
                   Available Case Quantity <span className="text-red-500">*</span>

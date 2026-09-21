@@ -1691,11 +1691,11 @@ const PurchaseEntry = () => {
       )}
 
       {/* ── Sub-Navigation Tabs inside Performo ── */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-3">
+      <div className="flex items-center gap-2 border-b border-slate-200 pb-3 overflow-x-auto no-scrollbar -mx-1 px-1 sm:mx-0 sm:px-0">
         <button
           type="button"
           onClick={() => setActiveTab('customer')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer ${activeTab === 'customer'
+          className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer shrink-0 ${activeTab === 'customer'
             ? 'bg-blue-600 text-white shadow-sm'
             : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
             }`}
@@ -1707,7 +1707,7 @@ const PurchaseEntry = () => {
         <button
           type="button"
           onClick={() => setActiveTab('product')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer ${activeTab === 'product'
+          className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer shrink-0 ${activeTab === 'product'
             ? 'bg-blue-600 text-white shadow-sm'
             : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
             }`}
@@ -1719,7 +1719,7 @@ const PurchaseEntry = () => {
         <button
           type="button"
           onClick={() => setActiveTab('account')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer ${activeTab === 'account'
+          className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer shrink-0 ${activeTab === 'account'
             ? 'bg-blue-600 text-white shadow-sm'
             : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
             }`}
@@ -1731,7 +1731,7 @@ const PurchaseEntry = () => {
         <button
           type="button"
           onClick={() => setActiveTab('performo')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer ${activeTab === 'performo'
+          className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer shrink-0 ${activeTab === 'performo'
             ? 'bg-blue-600 text-white shadow-sm'
             : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
             }`}
@@ -1743,7 +1743,7 @@ const PurchaseEntry = () => {
         <button
           type="button"
           onClick={() => setActiveTab('credit')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer ${activeTab === 'credit'
+          className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer shrink-0 ${activeTab === 'credit'
             ? 'bg-blue-600 text-white shadow-sm'
             : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
             }`}
@@ -3610,7 +3610,7 @@ const PurchaseEntry = () => {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
                 Phone Number <span className="text-rose-500">*</span>

@@ -74,24 +74,24 @@ const AdvancePayments = () => {
   return (
     <div className="space-y-6">
       {/* ── Summary Strip ── */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-8">
+      <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-5 shadow-sm">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-4 sm:gap-8">
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 bg-emerald-100 text-emerald-700 rounded-xl flex items-center justify-center font-bold">
+              <div className="w-10 h-10 sm:w-11 sm:h-11 bg-emerald-100 text-emerald-700 rounded-xl flex items-center justify-center font-bold">
                 <Wallet size={20} />
               </div>
               <div>
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total Advance Collected</p>
-                <p className="text-2xl font-black text-emerald-600">₹{totalAdvanceCollected.toLocaleString('en-IN')}</p>
+                <p className="text-xl sm:text-2xl font-black text-emerald-600">₹{totalAdvanceCollected.toLocaleString('en-IN')}</p>
               </div>
             </div>
 
-            <div className="w-px h-10 bg-gray-200"></div>
+            <div className="hidden sm:block w-px h-10 bg-gray-200"></div>
 
             <div>
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total Advance Receipts</p>
-              <p className="text-2xl font-black text-slate-800">{advancePayments.length} Receipts</p>
+              <p className="text-xl sm:text-2xl font-black text-slate-800">{advancePayments.length} Receipts</p>
             </div>
           </div>
 
@@ -100,7 +100,7 @@ const AdvancePayments = () => {
               setFormData((prev) => ({ ...prev, customerId: customers[0]?.id || '' }));
               setIsModalOpen(true);
             }}
-            className="flex items-center gap-1.5 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer"
+            className="w-full sm:w-auto flex items-center justify-center gap-1.5 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer"
           >
             <Plus size={16} /> Record Advance Payment
           </button>
@@ -108,26 +108,26 @@ const AdvancePayments = () => {
       </div>
 
       {/* ── Filters & Table Card ── */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-        <div className="flex items-center justify-between mb-5">
+      <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-5 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-5">
           <h3 className="font-bold text-gray-900 text-base">Advance Payments Ledger</h3>
 
-          <div className="flex items-center gap-3">
-            <div className="relative">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
+            <div className="relative flex-1 sm:flex-initial">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
                 placeholder="Search customer, reference..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-56 pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full sm:w-56 pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
 
             <select
               value={selectedCustomerIdFilter}
               onChange={(e) => setSelectedCustomerIdFilter(e.target.value)}
-              className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+              className="w-full sm:w-auto px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
             >
               <option value="All">All Customers</option>
               {customers.map((c) => (
@@ -138,7 +138,7 @@ const AdvancePayments = () => {
             <select
               value={paymentMethodFilter}
               onChange={(e) => setPaymentMethodFilter(e.target.value)}
-              className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+              className="w-full sm:w-auto px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
             >
               <option value="All">All Methods</option>
               <option value="UPI">UPI</option>

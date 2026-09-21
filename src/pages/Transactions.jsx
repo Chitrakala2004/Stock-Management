@@ -52,11 +52,11 @@ const Transactions = () => {
   return (
     <div>
       {/* Summary Strip */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6 flex items-center">
-        <div className="flex-1 flex items-center gap-8">
+      <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-5 mb-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 flex-1">
           {/* Total Transactions */}
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center">
+            <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center shrink-0">
               <Receipt size={18} className="text-slate-600" />
             </div>
             <div>
@@ -65,11 +65,9 @@ const Transactions = () => {
             </div>
           </div>
 
-          <div className="w-px h-10 bg-gray-200"></div>
-
           {/* Advance Received */}
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center">
+            <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center shrink-0">
               <Wallet size={18} className="text-green-600" />
             </div>
             <div>
@@ -78,11 +76,9 @@ const Transactions = () => {
             </div>
           </div>
 
-          <div className="w-px h-10 bg-gray-200"></div>
-
           {/* Total Dispatched Value */}
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center">
+            <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center shrink-0">
               <Send size={18} className="text-blue-600" />
             </div>
             <div>
@@ -91,11 +87,9 @@ const Transactions = () => {
             </div>
           </div>
 
-          <div className="w-px h-10 bg-gray-200"></div>
-
           {/* Cases Delivered */}
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center">
+            <div className="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center shrink-0">
               <Filter size={18} className="text-purple-600" />
             </div>
             <div>
@@ -105,15 +99,15 @@ const Transactions = () => {
           </div>
         </div>
 
-        <button className="flex items-center gap-1.5 px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 active:scale-[0.98] transition-all shadow-sm shadow-blue-200 ml-4 cursor-pointer">
+        <button className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 active:scale-[0.98] transition-all shadow-sm shadow-blue-200 cursor-pointer w-full lg:w-auto shrink-0">
           <Download size={15} />
           Export Ledger Report
         </button>
       </div>
 
       {/* Filter Bar */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4 flex items-center gap-3">
-        <div className="relative flex-1 max-w-xs">
+      <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+        <div className="relative flex-1">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
@@ -125,18 +119,18 @@ const Transactions = () => {
         </div>
 
         {/* Date Range */}
-        <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-600">
+        <div className="flex items-center justify-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-600">
           <Calendar size={14} className="text-gray-400" />
           <span>Aug 15 – Sep 15, 2024</span>
         </div>
 
         {/* Type Filter */}
-        <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-lg px-1 py-1">
+        <div className="flex items-center justify-center gap-1 bg-gray-50 border border-gray-200 rounded-lg px-1 py-1">
           {['All', 'Dispatch', 'Advance'].map((t) => (
             <button
               key={t}
               onClick={() => setTypeFilter(t)}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+              className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
                 typeFilter === t
                   ? t === 'Dispatch'
                     ? 'bg-blue-600 text-white shadow-sm'

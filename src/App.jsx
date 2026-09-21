@@ -40,11 +40,14 @@ function App() {
     }
   });
 
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
   const handleSetActivePage = (page) => {
     try {
       localStorage.setItem('stock_active_page', page);
     } catch {}
     setActivePage(page);
+    setIsMobileMenuOpen(false);
   };
 
   const ActiveComponent = pagesMap[activePage] || Customers;
@@ -52,13 +55,21 @@ function App() {
   return (
     <StockProvider>
       <div className="flex h-screen bg-[#f8fafc] font-sans overflow-hidden">
-        {/* Left Sidebar */}
-        <Sidebar activePage={activePage} setActivePage={handleSetActivePage} />
+        {/* Left Sidebar (Desktop fixed + Mobile off-canvas drawer) */}
+        <Sidebar
+          activePage={activePage}
+          setActivePage={handleSetActivePage}
+          isOpen={isMobileMenuOpen}
+          onClose={() => setIsMobileMenuOpen(false)}
+        />
 
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          <TopBar title={activePage} />
-          <main className="flex-1 overflow-y-auto p-6 md:p-8">
+          <TopBar
+            title={activePage}
+            onOpenSidebar={() => setIsMobileMenuOpen(true)}
+          />
+          <main className="flex-1 overflow-y-auto p-3.5 sm:p-5 md:p-8">
             <ActiveComponent setActivePage={handleSetActivePage} />
           </main>
         </div>
