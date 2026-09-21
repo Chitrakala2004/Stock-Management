@@ -918,6 +918,285 @@ const PurchaseEntry = () => {
     printWindow.document.close();
   };
 
+  // Print Complete Customer Purchase Bill / Invoice
+  const handlePrintBill = (billRecord) => {
+    if (!billRecord) return;
+    const b = billRecord.rawBill || billRecord;
+    const billItems = b.items || billRecord.items || [];
+    const cust = activeCustomer || customersList.find((c) => c.name === (b.customerName || billRecord.customerName)) || {};
+
+    const printWindow = window.open('', '_blank', 'width=850,height=900');
+    if (!printWindow) {
+      alert('Please allow popups to print/download the bill.');
+      return;
+    }
+
+    const billNo = b.billNo || billRecord.billNo || 'N/A';
+    const date = b.date || billRecord.date || getTodayDateString();
+    const customerName = b.customerName || billRecord.customerName || cust.name || 'Valued Customer';
+    const customerPhone = b.customerPhone || cust.phone || 'N/A';
+    const customerAddress = b.customerAddress || cust.address || 'N/A';
+    const customerGst = b.customerGst || cust.gst || 'N/A';
+    const companyName = b.companyName || billRecord.companyName || 'SIMBA FW';
+
+    const subtotal = b.subtotal !== undefined ? b.subtotal : (billRecord.debit || 0);
+    const discountAmount = b.discountAmount || 0;
+    const discountPercent = b.discountPercent || 0;
+    const packingAmount = b.packingAmount || 0;
+    const packingPercent = b.packingPercent || 0;
+    const taxAmount = b.taxAmount || 0;
+    const grandTotal = b.netTotal !== undefined ? b.netTotal : (billRecord.debit || subtotal);
+    const advancePaid = b.credit !== undefined ? b.credit : (billRecord.credit || 0);
+    const closingBalance = b.netBalance !== undefined ? b.netBalance : (grandTotal - advancePaid);
+
+    const itemsRowsHtml = billItems.length > 0 ? billItems.map((item, idx) => {
+      const pName = item.productName || item.particular || item.name || 'Product';
+      const pBrand = item.brand || item.companyName || companyName;
+      const cases = item.casesPurchased || item.cases || item.caseCount || item.totalCase || 0;
+      const pcsPerCase = item.piecesPerCase || item.pktUnits || 1;
+      const totalPieces = item.totalPieces || item.totalUnits || (cases * pcsPerCase);
+      const rate = item.pricePerPiece || item.rate || 0;
+      const amount = item.totalAmount || item.total || item.amount || (totalPieces * rate);
+
+      return `
+        <tr>
+          <td class="text-center" style="font-weight:bold; color:#64748b;">${idx + 1}</td>
+          <td style="font-weight:700; color:#0f172a;">${pName}</td>
+          <td style="color:#475569;"><span style="background:#f1f5f9; padding:2px 6px; border-radius:4px; font-size:11px; font-weight:600;">${pBrand}</span></td>
+          <td class="text-center" style="font-weight:700;">${cases}</td>
+          <td class="text-center">${pcsPerCase}</td>
+          <td class="text-center" style="font-weight:600;">${totalPieces}</td>
+          <td class="text-right" style="font-weight:600;">₹${Number(rate).toFixed(2)}</td>
+          <td class="text-right" style="font-weight:800; color:#0f172a;">₹${Number(amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        </tr>
+      `;
+    }).join('') : `
+      <tr>
+        <td colspan="8" class="text-center" style="padding:20px; color:#64748b;">Bill Summary Entry (#${billNo})</td>
+      </tr>
+    `;
+
+    const htmlContent = `<!DOCTYPE html>
+<html>
+  <head>
+    <title>Bill #${billNo} - ${customerName}</title>
+    <style>
+      @page { size: A4 portrait; margin: 10mm; }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        color: #0f172a;
+        margin: 0;
+        padding: 16px;
+        background: #fff;
+      }
+      .no-print-bar {
+        background: #0f172a;
+        color: #fff;
+        padding: 10px 18px;
+        border-radius: 8px;
+        margin-bottom: 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .btn-print {
+        background: #2563eb;
+        color: #fff;
+        border: none;
+        padding: 8px 18px;
+        font-weight: bold;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 13px;
+      }
+      .btn-print:hover { background: #1d4ed8; }
+      .header-box {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        border-bottom: 2px solid #0f172a;
+        padding-bottom: 12px;
+        margin-bottom: 14px;
+      }
+      .brand-title { font-size: 22px; font-weight: 900; margin: 0; color: #1e3a8a; letter-spacing: -0.5px; }
+      .brand-subtitle { font-size: 11px; color: #64748b; margin: 2px 0 0 0; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; }
+      .doc-badge {
+        background: #f8fafc;
+        border: 1px solid #cbd5e1;
+        padding: 8px 14px;
+        border-radius: 8px;
+        text-align: right;
+      }
+      .doc-badge .bill-title { font-weight: 900; font-size: 15px; color: #0f172a; }
+      .doc-badge .bill-meta { font-size: 11px; color: #475569; margin-top: 2px; }
+      .info-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 12px 14px;
+        margin-bottom: 14px;
+        font-size: 12px;
+      }
+      .info-block p { margin: 3px 0; }
+      .info-label { font-weight: 700; color: #475569; width: 110px; display: inline-block; }
+      .info-val { font-weight: 700; color: #0f172a; }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 11.5px;
+      }
+      th {
+        background: #1e293b;
+        color: #fff;
+        padding: 8px 8px;
+        text-align: left;
+        font-weight: 700;
+        font-size: 10.5px;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+      }
+      td {
+        padding: 7px 8px;
+        border-bottom: 1px solid #e2e8f0;
+      }
+      .text-center { text-align: center; }
+      .text-right { text-align: right; }
+      .summary-section {
+        margin-top: 14px;
+        display: flex;
+        justify-content: flex-end;
+      }
+      .summary-table {
+        width: 320px;
+        font-size: 12px;
+      }
+      .summary-table td { padding: 4px 8px; border: none; }
+      .summary-table .bold-row { font-weight: 800; font-size: 13px; border-top: 1px solid #cbd5e1; border-bottom: 2px solid #0f172a; }
+      .footer-section {
+        margin-top: 32px;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        padding-top: 16px;
+      }
+      .sign-box { text-align: center; width: 170px; }
+      .sign-line { border-top: 1px dashed #64748b; margin-top: 36px; padding-top: 4px; font-size: 11px; font-weight: 700; color: #334155; }
+      @media print {
+        .no-print-bar { display: none !important; }
+        body { padding: 0; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="no-print-bar">
+      <span style="font-size:13px; font-weight:600;">Bill #${billNo} ready for Print / PDF Export</span>
+      <button class="btn-print" onclick="window.print()">Print / Save as PDF</button>
+    </div>
+
+    <div class="header-box">
+      <div>
+        <h1 class="brand-title">DHEEKSHA TRADERS</h1>
+        <p class="brand-subtitle">Wholesale Fireworks & Stock Management System</p>
+      </div>
+      <div class="doc-badge">
+        <div class="bill-title">BILL / INVOICE</div>
+        <div class="bill-meta">Bill No: <strong>#${billNo}</strong></div>
+        <div class="bill-meta">Date: <strong>${date}</strong></div>
+      </div>
+    </div>
+
+    <div class="info-grid">
+      <div class="info-block">
+        <p><span class="info-label">Customer Name:</span> <span class="info-val">${customerName}</span></p>
+        <p><span class="info-label">Phone:</span> <span class="info-val">${customerPhone}</span></p>
+        <p><span class="info-label">Address:</span> <span class="info-val">${customerAddress}</span></p>
+      </div>
+      <div class="info-block">
+        <p><span class="info-label">Company:</span> <span class="info-val">${companyName}</span></p>
+        <p><span class="info-label">GSTIN:</span> <span class="info-val">${customerGst}</span></p>
+        <p><span class="info-label">Status:</span> <span class="info-val" style="color:#16a34a;">Confirmed</span></p>
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th class="text-center" style="width: 35px;">#</th>
+          <th>Particulars / Product Name</th>
+          <th>Brand / Co.</th>
+          <th class="text-center">Cases</th>
+          <th class="text-center">Pcs/Case</th>
+          <th class="text-center">Total Pcs</th>
+          <th class="text-right">Price / Pc</th>
+          <th class="text-right">Amount (₹)</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${itemsRowsHtml}
+      </tbody>
+    </table>
+
+    <div class="summary-section">
+      <table class="summary-table">
+        <tr>
+          <td>Subtotal Amount:</td>
+          <td class="text-right" style="font-weight:700;">₹${Number(subtotal).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        </tr>
+        ${discountAmount > 0 ? `
+        <tr>
+          <td>Discount (${discountPercent}%):</td>
+          <td class="text-right" style="color:#e11d48; font-weight:700;">- ₹${Number(discountAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        </tr>` : ''}
+        ${packingAmount > 0 ? `
+        <tr>
+          <td>Packing (${packingPercent}%):</td>
+          <td class="text-right" style="font-weight:700;">+ ₹${Number(packingAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        </tr>` : ''}
+        ${taxAmount > 0 ? `
+        <tr>
+          <td>Tax Amount:</td>
+          <td class="text-right" style="font-weight:700;">+ ₹${Number(taxAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        </tr>` : ''}
+        <tr class="bold-row">
+          <td>Grand Total Bill (Debit):</td>
+          <td class="text-right" style="color:#1e3a8a;">₹${Number(grandTotal).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        </tr>
+        <tr>
+          <td>Advance / Credit Applied:</td>
+          <td class="text-right" style="color:#16a34a; font-weight:700;">₹${Number(advancePaid).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        </tr>
+        <tr style="font-weight:800; font-size:12.5px; border-top:1px dashed #94a3b8;">
+          <td>Closing Net Balance:</td>
+          <td class="text-right" style="color:${closingBalance >= 0 ? '#16a34a' : '#e11d48'};">₹${Number(Math.abs(closingBalance)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${closingBalance >= 0 ? '(Advance Rem.)' : '(Due Payable)'}</td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="footer-section">
+      <div class="sign-box">
+        <div class="sign-line">Customer Signature</div>
+      </div>
+      <div class="sign-box">
+        <div class="sign-line">Authorized Signatory<br><strong>DHEEKSHA TRADERS</strong></div>
+      </div>
+    </div>
+
+    <script>
+      setTimeout(function() {
+        window.print();
+      }, 400);
+    </script>
+  </body>
+</html>`;
+
+    printWindow.document.open();
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
+
   // Add Credit Form State
   const [creditForm, setCreditForm] = useState({
     customerName: 'SAI MOHAN MARKETING',
@@ -1738,18 +2017,6 @@ const PurchaseEntry = () => {
         >
           <FileSpreadsheet size={16} />
           Performo Details
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('credit')}
-          className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer shrink-0 ${activeTab === 'credit'
-            ? 'bg-blue-600 text-white shadow-sm'
-            : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
-            }`}
-        >
-          <Wallet size={16} />
-          Add Credit
         </button>
       </div>
 
@@ -3099,7 +3366,14 @@ const PurchaseEntry = () => {
                           {formatCurrency(Math.abs(bill.balance || 0))}
                         </td>
                         <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                          <div className="flex items-center justify-center gap-2">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              onClick={() => handlePrintBill(bill)}
+                              className="p-1.5 text-slate-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                              title="Print Bill"
+                            >
+                              <Printer size={15} />
+                            </button>
                             <button
                               onClick={() => handleEditPerformoBill(bill.rawBill || bill)}
                               className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
@@ -3268,7 +3542,14 @@ const PurchaseEntry = () => {
                           {formatCurrency(bill.netTotal || bill.debit || 0)}
                         </td>
                         <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                          <div className="flex items-center justify-center gap-2">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              onClick={() => handlePrintBill(bill)}
+                              className="p-1.5 text-slate-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                              title="Print Bill"
+                            >
+                              <Printer size={15} />
+                            </button>
                             <button
                               onClick={() => handleViewCustomerStatement(bill.customer)}
                               className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold border border-blue-200 rounded-lg transition-all cursor-pointer flex items-center gap-1 text-[11px]"
@@ -3313,267 +3594,6 @@ const PurchaseEntry = () => {
 
 
 
-      {/* ========================================================================= */}
-      {/* ── STEP 5: ADD CREDIT ── */}
-      {/* ========================================================================= */}
-      {activeTab === 'credit' && (
-        <section className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-6 space-y-6">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2.5">
-              <Wallet size={20} className="text-blue-600" />
-              Add Credit
-            </h2>
-            <span className="text-xs font-semibold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-md">
-              Record Payment / Advance Credit
-            </span>
-          </div>
-
-          {/* Add Credit Form */}
-          <form onSubmit={handleAddCreditSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Customer Name */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Customer Name <span className="text-rose-500">*</span>
-                </label>
-                <div className="relative">
-                  <select
-                    value={creditForm.customerName}
-                    onChange={(e) =>
-                      setCreditForm({ ...creditForm, customerName: e.target.value })
-                    }
-                    className="w-full pl-4 pr-9 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 cursor-pointer appearance-none"
-                  >
-                    {customersList.map((c) => (
-                      <option key={c.id} value={c.name}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown
-                    size={16}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
-                  />
-                </div>
-              </div>
-
-              {/* Company Name */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Company Name <span className="text-rose-500">*</span>
-                </label>
-                <div className="relative">
-                  <select
-                    value={creditForm.companyName}
-                    onChange={(e) =>
-                      setCreditForm({ ...creditForm, companyName: e.target.value })
-                    }
-                    className="w-full pl-4 pr-9 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 cursor-pointer appearance-none"
-                  >
-                    {companyOptions.map((comp) => (
-                      <option key={comp} value={comp}>
-                        {comp}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown
-                    size={16}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
-                  />
-                </div>
-              </div>
-
-              {/* Credit Amount */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Credit Amount (₹) <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  required
-                  placeholder="e.g. 50000.00"
-                  value={creditForm.amount}
-                  onChange={(e) =>
-                    setCreditForm({ ...creditForm, amount: e.target.value })
-                  }
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 shadow-xs"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Payment Method */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Payment Method
-                </label>
-                <div className="relative">
-                  <select
-                    value={creditForm.paymentMethod}
-                    onChange={(e) =>
-                      setCreditForm({ ...creditForm, paymentMethod: e.target.value })
-                    }
-                    className="w-full pl-4 pr-9 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 cursor-pointer appearance-none"
-                  >
-                    <option value="UPI">UPI</option>
-                    <option value="Cash">Cash</option>
-                    <option value="Bank Transfer">Bank Transfer</option>
-                    <option value="NEFT">NEFT / RTGS</option>
-                    <option value="Cheque">Cheque</option>
-                  </select>
-                  <ChevronDown
-                    size={16}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
-                  />
-                </div>
-              </div>
-
-              {/* Reference No / Txn ID */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Payment Reference / Txn ID
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. UPI-982341 or CHQ-445123"
-                  value={creditForm.ref}
-                  onChange={(e) =>
-                    setCreditForm({ ...creditForm, ref: e.target.value })
-                  }
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
-                />
-              </div>
-
-              {/* Date */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Payment Date
-                </label>
-                <input
-                  type="date"
-                  value={creditForm.date}
-                  onChange={(e) =>
-                    setCreditForm({ ...creditForm, date: e.target.value })
-                  }
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center pt-1">
-
-
-              {/* Submit Button */}
-              <div className="md:col-span-4 flex items-end justify-end h-full">
-                <button
-                  type="submit"
-                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-xl transition-all shadow-sm cursor-pointer"
-                >
-                  Add Credit Payment
-                </button>
-              </div>
-            </div>
-          </form>
-
-          {/* Credit Feedback Banner */}
-          {creditFeedback && (
-            <div
-              className={`p-4 rounded-xl border text-xs font-semibold ${creditFeedback.type === 'success'
-                ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
-                : 'bg-rose-50 text-rose-900 border-rose-200'
-                }`}
-            >
-              <div className="flex items-start gap-2">
-                <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
-                <div>
-                  <p className="font-bold">{creditFeedback.message}</p>
-                  {creditFeedback.details && <p className="mt-0.5">{creditFeedback.details}</p>}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Credit Payment Records Table */}
-          <div className="pt-4 border-t border-slate-100 space-y-3">
-            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-              <Wallet size={16} className="text-blue-600" />
-              Credit Payment Records
-            </h3>
-            <div className="border border-slate-200 rounded-xl overflow-x-auto shadow-2xs">
-              <table className="w-full text-left text-xs border-collapse min-w-[800px]">
-                <thead className="bg-slate-100 border-b border-slate-200">
-                  <tr>
-                    <th className="py-3 px-4 font-bold text-slate-700 uppercase whitespace-nowrap">SL.NO</th>
-                    <th className="py-3 px-4 font-bold text-slate-700 uppercase whitespace-nowrap">CUSTOMER NAME</th>
-                    <th className="py-3 px-4 font-bold text-slate-700 uppercase whitespace-nowrap">COMPANY NAME</th>
-                    <th className="py-3 px-4 font-bold text-slate-700 uppercase whitespace-nowrap">CREDIT AMT</th>
-                    <th className="py-3 px-4 font-bold text-slate-700 uppercase whitespace-nowrap">PAYMENT METHOD</th>
-                    <th className="py-3 px-4 font-bold text-slate-700 uppercase whitespace-nowrap">PAYMENT REF ID</th>
-                    <th className="py-3 px-4 font-bold text-slate-700 uppercase whitespace-nowrap">DATE</th>
-                    <th className="py-3 px-4 font-bold text-slate-700 uppercase text-center whitespace-nowrap">ACTION</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 bg-white">
-                  {creditEntries.map((crd, index) => (
-                    <tr key={crd.id || index} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="py-3.5 px-4 font-bold text-slate-600 whitespace-nowrap">
-                        {index + 1}
-                      </td>
-                      <td className="py-3.5 px-4 font-bold text-slate-900 whitespace-nowrap">
-                        {crd.customerName}
-                      </td>
-                      <td className="py-3.5 px-4 font-semibold text-slate-700 whitespace-nowrap">
-                        {crd.companyName}
-                      </td>
-                      <td className="py-3.5 px-4 font-extrabold text-emerald-600 whitespace-nowrap">
-                        {formatCurrency(crd.creditAmt)}
-                      </td>
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        <span className="font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md text-[11px]">
-                          {crd.paymentMethod}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4 font-mono font-bold text-slate-800 whitespace-nowrap">
-                        {crd.paymentRefId}
-                      </td>
-                      <td className="py-3.5 px-4 font-semibold text-slate-600 whitespace-nowrap">
-                        {crd.date}
-                      </td>
-                      <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                        <div className="flex items-center justify-center gap-2">
-                          <button
-                            onClick={() => handleEditCreditEntry(crd)}
-                            className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
-                            title="Edit Credit Entry"
-                          >
-                            <Pencil size={15} />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteCreditEntry(crd.id)}
-                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                            title="Delete Credit Entry"
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-
-                  {creditEntries.length === 0 && (
-                    <tr>
-                      <td colSpan="8" className="text-center py-8 text-slate-400 font-medium">
-                        No credit payment records found. Add credit using the form above.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-      )}
       {/* ── Quick Add Customer Modal ── */}
       <Modal
         isOpen={isAddCustomerModalOpen}

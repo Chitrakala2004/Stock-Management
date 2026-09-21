@@ -471,8 +471,7 @@ const Customers = () => {
                 return (
                   <tr
                     key={cust.id}
-                    className="hover:bg-slate-50/60 transition-colors cursor-pointer group"
-                    onClick={() => openLedgerModal(cust)}
+                    className="hover:bg-slate-50/60 transition-colors"
                   >
                     {/* ID */}
                     <td className="py-4 px-6 font-mono text-blue-700 text-xs font-bold">
@@ -486,7 +485,7 @@ const Customers = () => {
                           {cust.name.charAt(0)}
                         </div>
                         <div>
-                          <p className="font-bold text-slate-900 text-sm tracking-wide uppercase group-hover:text-blue-600 transition-colors">
+                          <p className="font-bold text-slate-900 text-sm tracking-wide uppercase">
                             {cust.name}
                           </p>
                           <p className="text-xs text-slate-400 font-medium mt-0.5">
@@ -547,43 +546,27 @@ const Customers = () => {
                       </div>
                     </td>
 
-                    {/* Actions */}
-                    <td className="py-4 px-6" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center gap-1.5">
-                        {/* Action 1: Ledger / History */}
+                    {/* Actions: Edit & Delete ONLY */}
+                    <td className="py-4 px-6">
+                      <div className="flex items-center gap-2">
+                        {/* Edit */}
                         <button
-                          onClick={(e) => openLedgerModal(cust, e)}
-                          title="View Ledger & History"
-                          className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 flex items-center justify-center transition-colors cursor-pointer"
-                        >
-                          <CreditCard size={15} />
-                        </button>
-
-                        {/* Action 2: Add Credit / Payment */}
-                        <button
-                          onClick={(e) => openPaymentModal(cust, e)}
-                          title="Record Payment (Credit)"
-                          className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 flex items-center justify-center transition-colors cursor-pointer"
-                        >
-                          <Wallet size={15} />
-                        </button>
-
-                        {/* Action 3: Edit */}
-                        <button
-                          onClick={(e) => openEditModal(cust, e)}
+                          onClick={() => openEditModal(cust)}
                           title="Edit Customer"
-                          className="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 flex items-center justify-center transition-colors cursor-pointer"
+                          className="px-2.5 py-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 flex items-center gap-1 text-xs font-bold transition-colors cursor-pointer"
                         >
-                          <Edit3 size={15} />
+                          <Edit3 size={14} />
+                          <span>Edit</span>
                         </button>
 
-                        {/* Action 4: Delete */}
+                        {/* Delete */}
                         <button
-                          onClick={(e) => handleDelete(cust.id, e)}
+                          onClick={() => handleDelete(cust.id)}
                           title="Delete Customer"
-                          className="w-8 h-8 rounded-lg bg-slate-100 text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center transition-colors cursor-pointer"
+                          className="px-2.5 py-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 flex items-center gap-1 text-xs font-bold transition-colors cursor-pointer"
                         >
-                          <Trash2 size={15} />
+                          <Trash2 size={14} />
+                          <span>Delete</span>
                         </button>
                       </div>
                     </td>
