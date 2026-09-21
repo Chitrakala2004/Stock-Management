@@ -1,6 +1,18 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:5000/api';
+const getApiBaseUrl = () => {
+  const url = import.meta.env.VITE_API_URL;
+  if (!url || url.trim() === '') {
+    if (import.meta.env.PROD) {
+      return 'https://stock-management-4qkj.onrender.com/api';
+    }
+    return 'http://localhost:5000/api';
+  }
+  const cleanUrl = url.trim().replace(/\/+$/, '');
+  return cleanUrl.endsWith('/api') ? cleanUrl : `${cleanUrl}/api`;
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 const api = axios.create({
   baseURL: API_BASE_URL,

@@ -36,7 +36,21 @@ const Customers = () => {
   } = stockContext || {};
 
   const [customers, setCustomers] = useState([]);
-  const [transactions, setTransactions] = useState({});
+  const [transactions, setTransactions] = useState(() => {
+    try {
+      const saved = localStorage.getItem('stock_customer_manual_tx');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const saveManualTransactions = (updated) => {
+    setTransactions(updated);
+    try {
+      localStorage.setItem('stock_customer_manual_tx', JSON.stringify(updated));
+    } catch {}
+  };
 
   useEffect(() => {
     if (contextCustomers && contextCustomers.length > 0) {
@@ -47,15 +61,67 @@ const Customers = () => {
           phone: c.phone || 'N/A',
           gst: c.gst || 'N/A',
           address: c.address || 'N/A',
-          debit: getCustomerTotalPurchases ? getCustomerTotalPurchases(c.id) : (c.debit || 0),
-          credit: getCustomerTotalAdvance ? getCustomerTotalAdvance(c.id) : (c.credit || 0),
+          debit: getCustomerTotalPurchases ? getCustomerTotalPurchases(c.id || c.customId) : (c.debit || 0),
+          credit: getCustomerTotalAdvance ? getCustomerTotalAdvance(c.id || c.customId) : (c.credit || 0),
           email: c.email || '',
         }))
       );
-    } else {
-      setCustomers([]);
     }
   }, [contextCustomers, contextPurchases, contextAdvances]);
+
+  const getCustomerTransactionsList = (cust) => {
+    if (!cust) return [];
+    const targetId = cust.customId || cust.id || cust._id;
+    const targetName = (cust.name || '').toLowerCase();
+
+    // 1. Advances / Credits from context
+    const advances = (contextAdvances || [])
+      .filter((a) => {
+        const idMatch = a.customerId === targetId || a.customerId === cust.id || a.customerId === cust._id;
+        const nameMatch = a.customerName && a.customerName.toLowerCase() === targetName;
+        return idMatch || nameMatch;
+      })
+      .map((a) => ({
+        date: a.date || a.createdAt?.split('T')[0] || new Date().toISOString().split('T')[0],
+        ref: a.paymentReference || a.ref || `PAY-${(a.id || a._id || '').slice(-4) || 'ADV'}`,
+        desc: a.desc || `Payment Received via ${a.paymentMethod || 'Cash'}`,
+        type: 'credit',
+        amount: parseFloat(a.amount || a.creditAmt) || 0,
+      }));
+
+    // 2. Purchases / Debits from context
+    const customerPurchases = (contextPurchases || [])
+      .filter((p) => {
+        const idMatch = p.customerId === targetId || p.customerId === cust.id || p.customerId === cust._id;
+        const nameMatch =
+          (p.customerName && p.customerName.toLowerCase() === targetName) ||
+          (p.customer && p.customer.toLowerCase() === targetName);
+        return idMatch || nameMatch;
+      })
+      .map((p) => ({
+        date: p.date || p.purchaseDate || p.createdAt?.split('T')[0] || new Date().toISOString().split('T')[0],
+        ref: p.billNo || p.purchaseId || p.id || 'INV-PUR',
+        desc: p.desc || `Purchase Order (${p.items?.length || 1} items)`,
+        type: 'debit',
+        amount: parseFloat(p.totalPurchaseAmount || p.netTotal || p.debit) || 0,
+      }));
+
+    // 3. Manual session transactions
+    const manual = transactions[targetId] || transactions[cust.id] || [];
+
+    // Merge unique
+    const combined = [...advances, ...customerPurchases, ...manual];
+    const seen = new Set();
+    const unique = [];
+    for (const tx of combined) {
+      const key = `${tx.ref}-${tx.amount}-${tx.type}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        unique.push(tx);
+      }
+    }
+    return unique.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+  };
   const [search, setSearch] = useState('');
 
   // Modals
@@ -165,7 +231,7 @@ const Customers = () => {
 
     if (initialTx.length > 0 && savedCust) {
       const targetId = savedCust.id || savedCust.customId || savedCust._id;
-      setTransactions((prev) => ({ ...prev, [targetId]: initialTx }));
+      saveManualTransactions({ ...transactions, [targetId]: initialTx });
     }
 
     setFormData({ name: '', gst: '', address: '', phone: '', email: '', debit: '', credit: '' });
@@ -297,10 +363,12 @@ const Customers = () => {
       amount: amt,
     };
 
-    setTransactions((prev) => ({
-      ...prev,
-      [selectedCustomer.id]: [newTx, ...(prev[selectedCustomer.id] || [])],
-    }));
+    const targetCustId = selectedCustomer.customId || selectedCustomer.id || selectedCustomer._id;
+    const currentCustTx = transactions[targetCustId] || transactions[selectedCustomer.id] || [];
+    saveManualTransactions({
+      ...transactions,
+      [targetCustId]: [newTx, ...currentCustTx],
+    });
 
     setIsPaymentModalOpen(false);
   };
@@ -958,7 +1026,7 @@ const Customers = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {(transactions[selectedCustomer.id] || []).map((tx, idx) => (
+                    {getCustomerTransactionsList(selectedCustomer).map((tx, idx) => (
                       <tr key={idx} className="hover:bg-slate-50">
                         <td className="py-3 px-4 font-medium text-slate-600">{tx.date}</td>
                         <td className="py-3 px-4 font-mono font-semibold text-slate-900">{tx.ref}</td>
@@ -984,8 +1052,7 @@ const Customers = () => {
                       </tr>
                     ))}
 
-                    {(!transactions[selectedCustomer.id] ||
-                      transactions[selectedCustomer.id].length === 0) && (
+                    {getCustomerTransactionsList(selectedCustomer).length === 0 && (
                       <tr>
                         <td colSpan="5" className="text-center py-6 text-slate-400">
                           No transactions logged yet.

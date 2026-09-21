@@ -32,7 +32,20 @@ const pagesMap = {
 };
 
 function App() {
-  const [activePage, setActivePage] = useState('Customers');
+  const [activePage, setActivePage] = useState(() => {
+    try {
+      return localStorage.getItem('stock_active_page') || 'Customers';
+    } catch {
+      return 'Customers';
+    }
+  });
+
+  const handleSetActivePage = (page) => {
+    try {
+      localStorage.setItem('stock_active_page', page);
+    } catch {}
+    setActivePage(page);
+  };
 
   const ActiveComponent = pagesMap[activePage] || Customers;
 
@@ -40,13 +53,13 @@ function App() {
     <StockProvider>
       <div className="flex h-screen bg-[#f8fafc] font-sans overflow-hidden">
         {/* Left Sidebar */}
-        <Sidebar activePage={activePage} setActivePage={setActivePage} />
+        <Sidebar activePage={activePage} setActivePage={handleSetActivePage} />
 
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           <TopBar title={activePage} />
           <main className="flex-1 overflow-y-auto p-6 md:p-8">
-            <ActiveComponent setActivePage={setActivePage} />
+            <ActiveComponent setActivePage={handleSetActivePage} />
           </main>
         </div>
       </div>

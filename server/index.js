@@ -25,10 +25,28 @@ app.use('/api/transactions', require('./routes/stockTransactionRoutes'));
 app.use('/api/stocks', require('./routes/stockRoutes'));
 app.use('/api/dispatches', require('./routes/dispatchRoutes'));
 
-// Health check
-app.get('/', (req, res) => {
+const path = require('path');
+const fs = require('fs');
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
   res.json({ message: 'Stock Management API is running', status: 'Healthy', port: process.env.PORT || 5000 });
 });
+
+// Serve frontend build if present (for single-service deployment)
+const frontendDist = path.join(__dirname, '../src/dist');
+if (fs.existsSync(frontendDist)) {
+  app.use(express.static(frontendDist));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) return next();
+    res.sendFile(path.join(frontendDist, 'index.html'));
+  });
+} else {
+  // Standalone backend root health check
+  app.get('/', (req, res) => {
+    res.json({ message: 'Stock Management API is running', status: 'Healthy', port: process.env.PORT || 5000 });
+  });
+}
 
 const PORT = process.env.PORT || 5000;
 

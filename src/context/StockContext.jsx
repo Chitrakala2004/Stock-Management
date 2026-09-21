@@ -11,15 +11,62 @@ import {
 
 const StockContext = createContext();
 
+const loadInitial = (key, fallback = []) => {
+  try {
+    const saved = localStorage.getItem(`stock_cache_${key}`);
+    return saved ? JSON.parse(saved) : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+const saveCache = (key, data) => {
+  try {
+    if (data !== undefined && data !== null) {
+      localStorage.setItem(`stock_cache_${key}`, JSON.stringify(data));
+    }
+  } catch (e) {
+    console.warn(`Failed to save ${key} to cache`, e);
+  }
+};
 
 export const StockProvider = ({ children }) => {
-  const [brands, setBrands] = useState([]);
-  const [products, setProducts] = useState([]);
-  const [customers, setCustomers] = useState([]);
-  const [advancePayments, setAdvancePayments] = useState([]);
-  const [purchases, setPurchases] = useState([]);
-  const [stockTransactions, setStockTransactions] = useState([]);
-  const [dispatches, setDispatches] = useState([]);
+  const [brands, setBrands] = useState(() => loadInitial('brands', []));
+  const [products, setProducts] = useState(() => loadInitial('products', []));
+  const [customers, setCustomers] = useState(() => loadInitial('customers', []));
+  const [advancePayments, setAdvancePayments] = useState(() => loadInitial('advances', []));
+  const [purchases, setPurchases] = useState(() => loadInitial('purchases', []));
+  const [stockTransactions, setStockTransactions] = useState(() => loadInitial('txns', []));
+  const [dispatches, setDispatches] = useState(() => loadInitial('dispatches', []));
+
+  // Sync state changes automatically to localStorage cache
+  useEffect(() => {
+    if (brands.length > 0) saveCache('brands', brands);
+  }, [brands]);
+
+  useEffect(() => {
+    if (products.length > 0) saveCache('products', products);
+  }, [products]);
+
+  useEffect(() => {
+    if (customers.length > 0) saveCache('customers', customers);
+  }, [customers]);
+
+  useEffect(() => {
+    if (advancePayments.length > 0) saveCache('advances', advancePayments);
+  }, [advancePayments]);
+
+  useEffect(() => {
+    if (purchases.length > 0) saveCache('purchases', purchases);
+  }, [purchases]);
+
+  useEffect(() => {
+    if (stockTransactions.length > 0) saveCache('txns', stockTransactions);
+  }, [stockTransactions]);
+
+  useEffect(() => {
+    if (dispatches.length > 0) saveCache('dispatches', dispatches);
+  }, [dispatches]);
 
   // Fetch Live Data from Backend MongoDB Database on Mount
   const fetchAllFromBackend = async () => {
@@ -35,53 +82,63 @@ export const StockProvider = ({ children }) => {
       ]);
 
       if (custRes.data && custRes.data.length > 0) {
-        setCustomers(custRes.data.map(c => ({
+        const formatted = custRes.data.map(c => ({
           ...c,
           id: c.customId || c.id || c._id,
-        })));
+        }));
+        setCustomers(formatted);
+        saveCache('customers', formatted);
       }
       if (prodRes.data && prodRes.data.length > 0) {
-        setProducts(prodRes.data.map(p => ({
+        const formatted = prodRes.data.map(p => ({
           ...p,
           id: p.id || p._id,
-        })));
+        }));
+        setProducts(formatted);
+        saveCache('products', formatted);
       }
       if (brandRes.data && brandRes.data.length > 0) {
-        setBrands(
-          brandRes.data.map((b, idx) => ({
-            id: b._id || b.id || idx + 1,
-            _id: b._id || b.id,
-            name: typeof b === 'string' ? b : b.name,
-            address: b.address || 'Sivakasi, Tamil Nadu',
-            gst: b.gst || 'N/A',
-          }))
-        );
-      } else {
-        setBrands([]);
+        const formatted = brandRes.data.map((b, idx) => ({
+          id: b._id || b.id || idx + 1,
+          _id: b._id || b.id,
+          name: typeof b === 'string' ? b : b.name,
+          address: b.address || 'Sivakasi, Tamil Nadu',
+          gst: b.gst || 'N/A',
+        }));
+        setBrands(formatted);
+        saveCache('brands', formatted);
       }
       if (purRes.data && purRes.data.length > 0) {
-        setPurchases(purRes.data.map(p => ({
+        const formatted = purRes.data.map(p => ({
           ...p,
-          id: p.id || p._id,
-        })));
+          id: p.id || p._id || p.purchaseId,
+        }));
+        setPurchases(formatted);
+        saveCache('purchases', formatted);
       }
       if (advRes.data && advRes.data.length > 0) {
-        setAdvancePayments(advRes.data.map(a => ({
+        const formatted = advRes.data.map(a => ({
           ...a,
           id: a.id || a._id,
-        })));
+        }));
+        setAdvancePayments(formatted);
+        saveCache('advances', formatted);
       }
       if (txnRes.data && txnRes.data.length > 0) {
-        setStockTransactions(txnRes.data.map(t => ({
+        const formatted = txnRes.data.map(t => ({
           ...t,
           id: t.id || t._id,
-        })));
+        }));
+        setStockTransactions(formatted);
+        saveCache('txns', formatted);
       }
       if (dspRes.data && dspRes.data.length > 0) {
-        setDispatches(dspRes.data.map(d => ({
+        const formatted = dspRes.data.map(d => ({
           ...d,
           id: d.id || d._id,
-        })));
+        }));
+        setDispatches(formatted);
+        saveCache('dispatches', formatted);
       }
     } catch (err) {
       console.error('Error fetching MongoDB live data:', err);
@@ -469,8 +526,8 @@ export const StockProvider = ({ children }) => {
   };
 
   // Purchase Confirmation (Multi-Product Cart Allocation)
-  const confirmPurchase = ({ customerId, items, purchaseDate }) => {
-    const cust = customers.find((c) => c.id === customerId);
+  const confirmPurchase = async ({ customerId, items, purchaseDate }) => {
+    const cust = customers.find((c) => c.id === customerId || c.customId === customerId || c._id === customerId);
     if (!cust) return { success: false, error: 'Invalid Customer selected.' };
     if (!items || items.length === 0) return { success: false, error: 'Purchase cart is empty.' };
 
@@ -478,7 +535,8 @@ export const StockProvider = ({ children }) => {
     const totalPurchaseAmount = items.reduce((sum, item) => sum + item.totalAmount, 0);
 
     // 1. Validate Customer Remaining Advance Balance
-    const currentRemainingAdvance = getCustomerRemainingAdvance(customerId);
+    const targetCustId = cust.customId || cust.id || cust._id;
+    const currentRemainingAdvance = getCustomerRemainingAdvance(targetCustId);
     if (currentRemainingAdvance < totalPurchaseAmount) {
       return {
         success: false,
@@ -488,7 +546,7 @@ export const StockProvider = ({ children }) => {
 
     // 2. Validate Stock Availability for each item
     for (const item of items) {
-      const prod = products.find((p) => p.id === item.productId);
+      const prod = products.find((p) => p.id === item.productId || p._id === item.productId);
       if (!prod) {
         return { success: false, error: `Product "${item.productName}" no longer exists in stock.` };
       }
@@ -508,7 +566,10 @@ export const StockProvider = ({ children }) => {
     const snapshottedItems = items.map((item) => ({
       brand: item.brand,
       productName: item.productName,
+      particular: `${item.brand} - ${item.productName}`,
       productId: item.productId,
+      caseRequired: item.casesPurchased,
+      caseOut: item.casesPurchased,
       casesPurchased: item.casesPurchased,
       piecesPerCase: item.piecesPerCase,
       pricePerPiece: item.pricePerPiece,
@@ -518,12 +579,19 @@ export const StockProvider = ({ children }) => {
 
     const newPurchase = {
       id: purchaseId,
-      customerId,
+      purchaseId,
+      billNo: purchaseId,
+      customerId: targetCustId,
+      customer: cust.name,
       customerName: cust.name,
       purchaseDate: today,
+      date: today,
       status: 'Confirmed',
       items: snapshottedItems,
+      subtotal: totalPurchaseAmount,
+      netTotal: totalPurchaseAmount,
       totalPurchaseAmount,
+      debit: totalPurchaseAmount,
     };
 
     // Deduct stock for each item & log stock transaction
@@ -531,29 +599,67 @@ export const StockProvider = ({ children }) => {
     const newStockLogs = [];
 
     for (const item of items) {
-      const prodIndex = updatedProducts.findIndex((p) => p.id === item.productId);
+      const prodIndex = updatedProducts.findIndex((p) => p.id === item.productId || p._id === item.productId);
       if (prodIndex !== -1) {
         const p = updatedProducts[prodIndex];
         const newCases = p.availableCases - item.casesPurchased;
         updatedProducts[prodIndex] = { ...p, availableCases: newCases };
 
-        newStockLogs.push({
+        const logItem = {
           id: `STX-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
           date: today,
-          productId: p.id,
+          productId: p.id || p._id,
           productName: p.name,
           brand: p.brand,
           transactionType: 'Purchase Deduction',
           casesChanged: -item.casesPurchased,
           piecesChanged: -item.totalPieces,
           reason: `Confirmed Purchase ${purchaseId} for Customer ${cust.name}`,
-        });
+        };
+        newStockLogs.push(logItem);
+
+        // Async update stock in backend MongoDB
+        try {
+          productService.adjustStock(p.id || p._id, -item.casesPurchased);
+          transactionService.create(logItem);
+        } catch (e) {}
       }
     }
 
+    // Persist Purchase in backend MongoDB
+    try {
+      const res = await purchaseService.create(newPurchase);
+      if (res.data) {
+        newPurchase.id = res.data.id || res.data._id || newPurchase.id;
+        newPurchase._id = res.data._id || newPurchase.id;
+      }
+    } catch (err) {
+      console.error('Error persisting purchase to backend MongoDB:', err);
+    }
+
+    // Update customer debit balance in state and DB
+    const newDebit = (parseFloat(cust.debit) || 0) + totalPurchaseAmount;
+    const updatedCustomers = customers.map((c) =>
+      c.id === targetCustId || c.customId === targetCustId || c._id === targetCustId
+        ? { ...c, debit: newDebit }
+        : c
+    );
+    try {
+      customerService.update(targetCustId, { debit: newDebit });
+    } catch (e) {}
+
+    const nextPurchases = [newPurchase, ...purchases];
+    const nextStockTransactions = [...newStockLogs, ...stockTransactions];
+
     setProducts(updatedProducts);
-    setStockTransactions((prev) => [...newStockLogs, ...prev]);
-    setPurchases((prev) => [newPurchase, ...prev]);
+    setStockTransactions(nextStockTransactions);
+    setPurchases(nextPurchases);
+    setCustomers(updatedCustomers);
+
+    saveCache('products', updatedProducts);
+    saveCache('purchases', nextPurchases);
+    saveCache('txns', nextStockTransactions);
+    saveCache('customers', updatedCustomers);
 
     return {
       success: true,
@@ -629,6 +735,19 @@ export const StockProvider = ({ children }) => {
     }
   };
 
+  const deletePurchase = async (id) => {
+    try {
+      await purchaseService.delete(id);
+    } catch (err) {
+      console.error('Error deleting purchase from backend:', err);
+    }
+    setPurchases((prev) => {
+      const filtered = prev.filter((p) => p.id !== id && p._id !== id && p.purchaseId !== id && p.billNo !== id);
+      saveCache('purchases', filtered);
+      return filtered;
+    });
+  };
+
   // Dashboard Aggregated Metrics
   const totalCustomersCount = customers.length;
   const totalAdvanceCollected = advancePayments.reduce((sum, a) => sum + (a.amount || 0), 0);
@@ -687,6 +806,7 @@ export const StockProvider = ({ children }) => {
         addAdvancePayment,
         purchases,
         addPurchaseBill,
+        deletePurchase,
         dispatches,
         addDispatch,
         confirmPurchase,

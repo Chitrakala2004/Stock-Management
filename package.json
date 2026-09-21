@@ -4,6 +4,8 @@
   "description": "Stock Management Application - React Frontend & Node.js Backend",
   "private": true,
   "scripts": {
+    "start": "node server/index.js",
+    "build": "npm --prefix src install && npm --prefix src run build && npm --prefix server install",
     "client": "cd src && npm run dev",
     "server": "cd server && npm run dev",
     "mongo": "\"C:\\Users\\chitr\\mongodb\\MongoDB\\Server\\8.3\\bin\\mongod.exe\" --dbpath \"C:\\Users\\chitr\\mongodb\\data\" --port 27017 --bind_ip 127.0.0.1",
