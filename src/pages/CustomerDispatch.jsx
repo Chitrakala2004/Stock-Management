@@ -285,7 +285,7 @@ const CustomerDispatch = () => {
             >
               {customers.map((c) => (
                 <option key={c.id || c.customId} value={c.id || c.customId}>
-                  {c.name} ({c.customId || c.id})
+                  {c.name}
                 </option>
               ))}
             </select>

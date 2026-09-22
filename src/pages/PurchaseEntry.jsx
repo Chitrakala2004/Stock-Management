@@ -1410,41 +1410,6 @@ const PurchaseEntry = () => {
     return customerPendingCasesList.reduce((sum, item) => sum + (item.pendingCases || 0), 0);
   }, [customerPendingCasesList]);
 
-  // Handler to load a single pending case item into current requirement order
-  const handleLoadSinglePendingCase = (item) => {
-    setAddedRequiredProducts((prev) => {
-      const existingIdx = prev.findIndex(
-        (p) =>
-          p.productName?.toLowerCase() === item.productName?.toLowerCase() &&
-          (p.companyName || '').toUpperCase() === (item.companyName || '').toUpperCase()
-      );
-      if (existingIdx !== -1) {
-        const updated = [...prev];
-        const prevCases = parseFloat(updated[existingIdx].cases) || 0;
-        updated[existingIdx] = {
-          ...updated[existingIdx],
-          cases: (prevCases + item.pendingCases).toString(),
-        };
-        return updated;
-      }
-      return [
-        ...prev,
-        {
-          id: Date.now() + Math.random(),
-          productId: `${currentCustNum}-${String(prev.length + 1).padStart(2, '0')}`,
-          productName: item.productName,
-          companyName: item.companyName,
-          cases: item.pendingCases.toString(),
-          pktUnits: item.pktUnits,
-        },
-      ];
-    });
-
-    setFeedback({
-      type: 'success',
-      message: `Added ${item.pendingCases} pending cases of "${item.productName}" (Bill #${item.billNo}) to order requirements.`,
-    });
-  };
 
   // Handler to load all pending cases into current requirement order
   const handleLoadAllPendingCases = () => {
@@ -2070,16 +2035,11 @@ const PurchaseEntry = () => {
                   className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 cursor-pointer shadow-xs"
                 >
                   <option value="">Select Customer Account</option>
-                  {customersList.map((c) => {
-                    const rem = getCustomerRemainingAdvance
-                      ? getCustomerRemainingAdvance(c.id)
-                      : ((c.credit || 0) - (c.debit || 0));
-                    return (
-                      <option key={c.id} value={c.id}>
-                        {c.name} ({c.customId || c.id}){rem !== 0 ? ` • [Remaining: ${formatCurrency(rem)}]` : ''}
-                      </option>
-                    );
-                  })}
+                  {customersList.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -2286,7 +2246,6 @@ const PurchaseEntry = () => {
                       <th className="py-2.5 px-3 text-center">Ordered</th>
                       <th className="py-2.5 px-3 text-center">Sent</th>
                       <th className="py-2.5 px-3 text-center font-black text-amber-900">Remaining to Send</th>
-                      <th className="py-2.5 px-3 text-center">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-amber-100">
@@ -2313,16 +2272,6 @@ const PurchaseEntry = () => {
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-100 text-amber-900 border border-amber-300">
                             {item.pendingCases} Cases Pending
                           </span>
-                        </td>
-                        <td className="py-2.5 px-3 text-center whitespace-nowrap">
-                          <button
-                            type="button"
-                            onClick={() => handleLoadSinglePendingCase(item)}
-                            className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white rounded-lg text-[11px] font-bold transition-all shadow-2xs cursor-pointer"
-                            title={`Load ${item.pendingCases} cases into current order`}
-                          >
-                            + Add to Order
-                          </button>
                         </td>
                       </tr>
                     ))}
@@ -3250,7 +3199,7 @@ const PurchaseEntry = () => {
                 <option value="">Select Customer Account...</option>
                 {customersList.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.name} ({c.customId || c.id})
+                    {c.name}
                   </option>
                 ))}
               </select>
@@ -3452,7 +3401,7 @@ const PurchaseEntry = () => {
                 <option value="">Select Customer Account...</option>
                 {customersList.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.name} ({c.customId || c.id})
+                    {c.name}
                   </option>
                 ))}
               </select>
