@@ -24,6 +24,7 @@ import {
   RotateCcw,
   Boxes,
   Truck,
+  Search,
 } from 'lucide-react';
 import Modal from '../components/Modal';
 
@@ -231,15 +232,98 @@ const PurchaseEntry = () => {
   const [purchaseDate, setPurchaseDate] = useState(getTodayDateString());
   const [customerAdvanceInput, setCustomerAdvanceInput] = useState('');
 
-  // Auto-sync step2Customer name when selectedCustomerId changes
+  // Customer Search & Suggestions Dropdown State
+  const [customerSearchInput, setCustomerSearchInput] = useState('');
+  const [isCustomerDropdownOpen, setIsCustomerDropdownOpen] = useState(false);
+  const customerDropdownRef = useRef(null);
+
+  // Company Suggestions Dropdown State
+  const [isCompanyDropdownOpen, setIsCompanyDropdownOpen] = useState(false);
+  const companyDropdownRef = useRef(null);
+
+  // Close floating suggestion dropdowns when clicking outside
   useEffect(() => {
-    if (selectedCustomerId && customersList.length > 0) {
-      const cust = customersList.find((c) => c.id === selectedCustomerId);
-      if (cust) {
-        setStep2Customer(cust.name);
+    const handleClickOutside = (event) => {
+      if (
+        customerDropdownRef.current &&
+        !customerDropdownRef.current.contains(event.target)
+      ) {
+        setIsCustomerDropdownOpen(false);
       }
+      if (
+        companyDropdownRef.current &&
+        !companyDropdownRef.current.contains(event.target)
+      ) {
+        setIsCompanyDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Auto-sync customerSearchInput & step2Customer when selectedCustomerId or activeCustomer changes
+  useEffect(() => {
+    if (activeCustomer) {
+      setCustomerSearchInput(activeCustomer.name);
+      setStep2Customer(activeCustomer.name);
+    } else if (!selectedCustomerId) {
+      setCustomerSearchInput('');
+      setStep2Customer('');
     }
-  }, [selectedCustomerId, customersList]);
+  }, [activeCustomer, selectedCustomerId]);
+
+  const filteredCustomerSuggestions = React.useMemo(() => {
+    const query = (customerSearchInput || '').trim().toLowerCase();
+    if (!query) return customersList;
+    return customersList.filter(
+      (c) =>
+        (c.name || '').toLowerCase().includes(query) ||
+        (c.customId || c.id || '').toLowerCase().includes(query) ||
+        (c.phone || '').includes(query)
+    );
+  }, [customerSearchInput, customersList]);
+
+  const handleSelectCustomer = (cust) => {
+    if (!cust) {
+      setSelectedCustomerId('');
+      setStep2Customer('');
+      setCustomerSearchInput('');
+      setIsCustomerDropdownOpen(false);
+      return;
+    }
+    const id = cust.id || cust.customId;
+    setSelectedCustomerId(id);
+    setStep2Customer(cust.name);
+    setCustomerSearchInput(cust.name);
+    setIsCustomerDropdownOpen(false);
+
+    // Reset draft order rows & inputs when customer changes
+    setProductRows([]);
+    setAddedRequiredProducts([]);
+    setReqEntryProduct('');
+    setReqEntryCases('');
+    setEntryParticular('');
+    setEntryCase('');
+    setEntryRate('');
+    setEntryPktUnits('');
+    setStep2Discount('');
+    setStep2Packing('');
+    setStep2Tax('');
+    setCustomerAdvanceInput('');
+    setFeedback(null);
+    setCreditFeedback(null);
+  };
+
+  const handleClearCustomer = () => {
+    setSelectedCustomerId('');
+    setStep2Customer('');
+    setCustomerSearchInput('');
+    setIsCustomerDropdownOpen(false);
+    setProductRows([]);
+    setAddedRequiredProducts([]);
+    setCustomerAdvanceInput('');
+    setFeedback(null);
+  };
 
   // Quick Add Customer Modal State inside Performo
   const [isAddCustomerModalOpen, setIsAddCustomerModalOpen] = useState(false);
@@ -472,6 +556,13 @@ const PurchaseEntry = () => {
       ...((contextProducts || []).map((p) => p.brand || p.company || p.companyName).filter(Boolean)),
     ])
   );
+
+  // Company suggestions: filter allCompanyOptions by typed text
+  const filteredCompanySuggestions = React.useMemo(() => {
+    const query = (reqActiveCompany || '').trim().toLowerCase();
+    if (!query) return allCompanyOptions;
+    return allCompanyOptions.filter((c) => c.toLowerCase().includes(query));
+  }, [reqActiveCompany, allCompanyOptions]);
 
   // Product suggestions: prioritize products matching active company
   const allProductSuggestions = React.useMemo(() => {
@@ -2080,42 +2171,73 @@ const PurchaseEntry = () => {
                     <Plus size={13} /> Add Customer
                   </button>
                 </div>
-                <select
-                  value={selectedCustomerId}
-                  onChange={(e) => {
-                    const id = e.target.value;
-                    setSelectedCustomerId(id);
-                    const cust = customersList.find((c) => c.id === id);
-                    if (cust) {
-                      setStep2Customer(cust.name);
-                    } else {
-                      setStep2Customer('');
-                    }
-                    // Reset order items and draft inputs when customer changes
-                    setProductRows([]);
-                    setAddedRequiredProducts([]);
-                    setReqEntryProduct('');
-                    setReqEntryCases('');
-                    setEntryParticular('');
-                    setEntryCase('');
-                    setEntryRate('');
-                    setEntryPktUnits('');
-                    setStep2Discount('');
-                    setStep2Packing('');
-                    setStep2Tax('');
-                    setCustomerAdvanceInput('');
-                    setFeedback(null);
-                    setCreditFeedback(null);
-                  }}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 cursor-pointer shadow-xs"
-                >
-                  <option value="">Select Customer Account</option>
-                  {customersList.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative" ref={customerDropdownRef}>
+                  <div className="relative">
+                    <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    <input
+                      type="text"
+                      placeholder="Type customer name, phone, or ID..."
+                      value={customerSearchInput}
+                      onChange={(e) => {
+                        setCustomerSearchInput(e.target.value);
+                        setIsCustomerDropdownOpen(true);
+                        if (!e.target.value.trim()) {
+                          handleClearCustomer();
+                        }
+                      }}
+                      onFocus={() => setIsCustomerDropdownOpen(true)}
+                      className="w-full pl-10 pr-9 py-3 bg-slate-50 border border-slate-200 focus:border-blue-600 rounded-xl text-sm font-bold text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 shadow-xs uppercase tracking-wide"
+                    />
+                    {customerSearchInput && (
+                      <button
+                        type="button"
+                        onClick={handleClearCustomer}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 rounded-lg transition-colors cursor-pointer"
+                        title="Clear customer selection"
+                      >
+                        <X size={15} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Suggestion List Popup */}
+                  {isCustomerDropdownOpen && (
+                    <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-slate-200 rounded-xl shadow-2xl z-50 max-h-64 overflow-y-auto divide-y divide-slate-100 animate-in fade-in zoom-in-95 duration-100">
+                      {filteredCustomerSuggestions.length > 0 ? (
+                        filteredCustomerSuggestions.map((c) => {
+                          const isSelected = selectedCustomerId === c.id || selectedCustomerId === c.customId;
+                          return (
+                            <div
+                              key={c.id}
+                              onClick={() => handleSelectCustomer(c)}
+                              className={`px-4 py-2.5 flex items-center justify-between hover:bg-blue-50/80 cursor-pointer transition-colors ${
+                                isSelected ? 'bg-blue-50 text-blue-900 font-bold' : 'text-slate-800 font-medium'
+                              }`}
+                            >
+                              <span className="text-sm tracking-wide">{c.name}</span>
+                              {isSelected && <Check size={16} className="text-blue-600" />}
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div className="p-4 text-center space-y-2">
+                          <p className="text-xs text-slate-500">No customer found matching &quot;{customerSearchInput}&quot;</p>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setNewCustomerForm((prev) => ({ ...prev, name: customerSearchInput.toUpperCase() }));
+                              setIsAddCustomerModalOpen(true);
+                              setIsCustomerDropdownOpen(false);
+                            }}
+                            className="text-xs font-bold text-blue-600 hover:text-blue-800 inline-flex items-center gap-1 cursor-pointer bg-blue-50 px-3 py-1 rounded-lg transition-colors"
+                          >
+                            <Plus size={13} /> + Add &quot;{customerSearchInput}&quot; as New Customer
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="md:col-span-3">
@@ -2425,30 +2547,59 @@ const PurchaseEntry = () => {
                     <span>Company Selection (Type / Select Company First)</span>
                     <span className="text-[10px] normal-case font-normal text-slate-500">(Text Box)</span>
                   </label>
-                  <div className="relative max-w-lg">
+                  <div className="relative max-w-lg" ref={companyDropdownRef}>
                     <input
                       id="req-active-company-top"
                       ref={reqCompanyInputRef}
                       type="text"
-                      list="required-companies-datalist"
-                      placeholder="Type company name (e.g. J K PYRO TECH, EVAREST FW, SIMBA FW)..."
+                      placeholder="Type company name (e.g. SIMBA FW, STANDARD FIREWORKS, AJANTA BRAND)..."
                       value={reqActiveCompany}
-                      onChange={(e) => setReqActiveCompany(e.target.value)}
-                      onKeyDown={(e) => handleReqKeyDown(e, 'company')}
-                      className="w-full px-3.5 py-2.5 bg-white border border-slate-300 focus:border-blue-600 rounded-xl font-bold text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-xs shadow-2xs uppercase tracking-wide"
+                      onChange={(e) => {
+                        setReqActiveCompany(e.target.value);
+                        setIsCompanyDropdownOpen(true);
+                      }}
+                      onFocus={() => setIsCompanyDropdownOpen(true)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          setIsCompanyDropdownOpen(false);
+                        }
+                        handleReqKeyDown(e, 'company');
+                      }}
+                      className="w-full pl-3.5 pr-9 py-2.5 bg-white border border-slate-300 focus:border-blue-600 rounded-xl font-bold text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-xs shadow-2xs uppercase tracking-wide"
                     />
                     {reqActiveCompany && (
                       <button
                         type="button"
                         onClick={() => {
                           setReqActiveCompany('');
+                          setIsCompanyDropdownOpen(false);
                           reqCompanyInputRef.current?.focus();
                         }}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 rounded-lg transition-colors cursor-pointer"
                         title="Clear Company"
                       >
                         <X size={14} />
                       </button>
+                    )}
+
+                    {/* Floating Company Suggestions Menu */}
+                    {isCompanyDropdownOpen && filteredCompanySuggestions.length > 0 && (
+                      <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-slate-200 rounded-xl shadow-xl z-50 max-h-52 overflow-y-auto divide-y divide-slate-100 animate-in fade-in zoom-in-95 duration-100">
+                        {filteredCompanySuggestions.map((comp, idx) => (
+                          <div
+                            key={idx}
+                            onClick={() => {
+                              setReqActiveCompany(comp);
+                              setIsCompanyDropdownOpen(false);
+                              reqProdInputRef.current?.focus();
+                            }}
+                            className="px-3.5 py-2 text-xs font-bold text-slate-800 hover:bg-blue-50 hover:text-blue-900 cursor-pointer transition-colors uppercase tracking-wide flex items-center justify-between"
+                          >
+                            <span>{comp}</span>
+                            <span className="text-[10px] text-slate-400 font-normal">Select</span>
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
                 </div>
