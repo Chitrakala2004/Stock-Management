@@ -6,6 +6,9 @@ const productSchema = new mongoose.Schema(
       type: String,
       default: 'Standard Crackers',
     },
+    companyName: {
+      type: String,
+    },
     name: {
       type: String,
       required: [true, 'Please add product name'],
@@ -24,15 +27,27 @@ const productSchema = new mongoose.Schema(
       default: 10,
       min: 0,
     },
+    rate: {
+      type: Number,
+      default: 10,
+    },
     piecesPerCase: {
       type: Number,
       default: 10,
       min: 1,
     },
+    pktUnits: {
+      type: Number,
+      default: 10,
+    },
     availableCases: {
       type: Number,
       default: 50,
       min: 0,
+    },
+    cases: {
+      type: Number,
+      default: 50,
     },
     minStockCases: {
       type: Number,

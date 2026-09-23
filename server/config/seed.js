@@ -55,33 +55,159 @@ const initialBrands = [
 
 const initialProducts = [
   {
-    brand: 'Standard Crackers',
-    name: 'Flower Pot (Deluxe)',
-    category: 'Flower Pots',
-    image: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300&q=80',
-    pricePerPiece: 2,
+    brand: 'SIMBA FW',
+    companyName: 'SIMBA FW',
+    name: '20 SKY SHOT',
+    category: 'Aerial Shots',
+    pricePerPiece: 240,
+    rate: 240,
     piecesPerCase: 10,
+    pktUnits: 10,
     availableCases: 100,
+    cases: 100,
     minStockCases: 15,
   },
   {
     brand: 'Standard Crackers',
+    companyName: 'Standard Crackers',
     name: '10cm Electric Sparklers',
     category: 'Sparklers',
-    image: 'https://images.unsplash.com/photo-1513151233558-d860c5398176?w=300&q=80',
-    pricePerPiece: 12,
-    piecesPerCase: 100,
+    pricePerPiece: 120,
+    rate: 120,
+    piecesPerCase: 10,
+    pktUnits: 10,
     availableCases: 150,
+    cases: 150,
     minStockCases: 20,
   },
   {
+    brand: 'SIMBA FW',
+    companyName: 'SIMBA FW',
+    name: 'Ground Chakkar Deluxe',
+    category: 'Ground Chakkars',
+    pricePerPiece: 180,
+    rate: 180,
+    piecesPerCase: 20,
+    pktUnits: 20,
+    availableCases: 120,
+    cases: 120,
+    minStockCases: 15,
+  },
+  {
+    brand: 'SIMBA FW',
+    companyName: 'SIMBA FW',
+    name: 'Special Flower Pots',
+    category: 'Flower Pots',
+    pricePerPiece: 150,
+    rate: 150,
+    piecesPerCase: 10,
+    pktUnits: 10,
+    availableCases: 90,
+    cases: 90,
+    minStockCases: 10,
+  },
+  {
+    brand: 'Coronation Fireworks',
+    companyName: 'Coronation Fireworks',
+    name: '30-Shot Multi Color Aerial',
+    category: 'Aerial Shots',
+    pricePerPiece: 450,
+    rate: 450,
+    piecesPerCase: 10,
+    pktUnits: 10,
+    availableCases: 50,
+    cases: 50,
+    minStockCases: 10,
+  },
+  {
+    brand: 'Sri Kaliswari Fireworks',
+    companyName: 'Sri Kaliswari Fireworks',
+    name: 'Hydro Atom Bomb',
+    category: 'Atom Bombs',
+    pricePerPiece: 160,
+    rate: 160,
+    piecesPerCase: 10,
+    pktUnits: 10,
+    availableCases: 120,
+    cases: 120,
+    minStockCases: 25,
+  },
+  {
+    brand: 'Ayyan Fireworks',
+    companyName: 'Ayyan Fireworks',
+    name: 'Whistling Rockets',
+    category: 'Rockets',
+    pricePerPiece: 210,
+    rate: 210,
+    piecesPerCase: 25,
+    pktUnits: 25,
+    availableCases: 80,
+    cases: 80,
+    minStockCases: 15,
+  },
+  {
+    brand: 'Vadivel Pyrotechnics',
+    companyName: 'Vadivel Pyrotechnics',
+    name: 'Deepavali Family Gift Box',
+    category: 'Gift Boxes',
+    pricePerPiece: 380,
+    rate: 380,
+    piecesPerCase: 10,
+    pktUnits: 10,
+    availableCases: 65,
+    cases: 65,
+    minStockCases: 15,
+  },
+  {
+    brand: 'Standard Crackers',
+    companyName: 'Standard Crackers',
+    name: 'Flower Pot (Deluxe)',
+    category: 'Flower Pots',
+    pricePerPiece: 240,
+    rate: 240,
+    piecesPerCase: 10,
+    pktUnits: 10,
+    availableCases: 100,
+    cases: 100,
+    minStockCases: 15,
+  },
+  {
     brand: 'Ajanta Brand',
+    companyName: 'Ajanta Brand',
     name: 'Ground Chakkar (Big)',
     category: 'Ground Chakkars',
-    image: 'https://images.unsplash.com/photo-1531306728370-e2ebd9d7bb99?w=300&q=80',
-    pricePerPiece: 5,
+    pricePerPiece: 180,
+    rate: 180,
     piecesPerCase: 20,
+    pktUnits: 20,
     availableCases: 80,
+    cases: 80,
+    minStockCases: 10,
+  },
+  {
+    brand: 'JOKER BRAND',
+    companyName: 'JOKER BRAND',
+    name: '120 shot',
+    category: 'Aerial Shots',
+    pricePerPiece: 350,
+    rate: 350,
+    piecesPerCase: 5,
+    pktUnits: 5,
+    availableCases: 50,
+    cases: 50,
+    minStockCases: 10,
+  },
+  {
+    brand: 'VADIVEL',
+    companyName: 'VADIVEL',
+    name: 'Flower pot',
+    category: 'Flower Pots',
+    pricePerPiece: 140,
+    rate: 140,
+    piecesPerCase: 10,
+    pktUnits: 10,
+    availableCases: 60,
+    cases: 60,
     minStockCases: 10,
   },
 ];
@@ -100,13 +226,36 @@ const seedDB = async () => {
       console.log('🌱 Seeded default brands to MongoDB');
     }
 
-    const prodCount = await Product.countDocuments();
-    if (prodCount === 0) {
-      await Product.insertMany(initialProducts);
-      console.log('🌱 Seeded default products to MongoDB');
+    // Ensure all standard products exist in Product collection
+    const existingProducts = await Product.find({}).lean();
+    for (const p of initialProducts) {
+      const match = existingProducts.find(
+        (ep) => (ep.name || '').trim().toLowerCase() === p.name.trim().toLowerCase()
+      );
+      if (!match) {
+        await Product.create(p);
+        console.log(`🌱 Added missing product to MongoDB: ${p.name}`);
+      }
+    }
+
+    // Clean up any wrong / test records on startup
+    await Purchase.deleteMany({ customerName: /General Customer/i });
+    const Dispatch = require('../models/Dispatch');
+    await Dispatch.deleteMany({ customerName: /General Customer/i });
+
+    // Link customerId for purchases missing customerId
+    const customers = await Customer.find({}).lean();
+    const unlinkedPurchases = await Purchase.find({ customerId: { $in: [null, undefined, ''] } });
+    for (const pur of unlinkedPurchases) {
+      const cName = (pur.customerName || pur.customer || '').trim().toLowerCase();
+      const matched = customers.find(c => (c.name || '').trim().toLowerCase() === cName);
+      if (matched) {
+        pur.customerId = matched.customId || matched._id.toString();
+        await pur.save();
+      }
     }
   } catch (err) {
-    console.error('Seeding error:', err.message);
+    console.error('Seeding & Startup Sync error:', err.message);
   }
 };
 

@@ -682,13 +682,18 @@ const PurchaseEntry = () => {
   // Proceed to Product Entry & Billing Setup Handler
   // Works reliably: auto-selects first customer if none chosen, and always navigates smoothly to Step 2
   const handleProceedToBilling = () => {
-    // If no customer selected yet, auto-select the first available customer
-    if (!selectedCustomerId && customersList.length > 0) {
-      const firstCust = customersList[0];
-      setSelectedCustomerId(firstCust.id);
-      setStep2Customer(firstCust.name);
-    } else if (!step2Customer) {
-      setStep2Customer(activeCustomer ? activeCustomer.name : 'General Customer');
+    // Require user to explicitly select or create a customer
+    if (!activeCustomer && !selectedCustomerId) {
+      setFeedback({
+        type: 'error',
+        message: 'Please select a customer account first before proceeding to billing setup.',
+      });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    if (activeCustomer) {
+      setStep2Customer(activeCustomer.name);
     }
 
     // Auto-sync total cases to Step 2
@@ -1327,6 +1332,11 @@ const PurchaseEntry = () => {
     const recCustId = record.customerId;
     const recCustName = (record.customerName || record.customer || '').trim().toLowerCase();
 
+    // Ignore generic/placeholder names
+    if (!recCustName || recCustName === 'general customer' || recCustName === 'customer') {
+      return false;
+    }
+
     const idMatches = Boolean(
       recCustId &&
       (recCustId === custId ||
@@ -1344,6 +1354,15 @@ const PurchaseEntry = () => {
     if (!activeCustomer) return [];
     return performoBills.filter((b) => isMatchCustomer(b, activeCustomer));
   }, [performoBills, activeCustomer]);
+
+  // Confirmed orders flag: Customer has confirmed orders in the system
+  const hasPreviousBills = Boolean(
+    activeCustomer &&
+    customerPerformoBills &&
+    customerPerformoBills.length > 0
+  );
+
+  const isCurrentCustomerNew = !hasPreviousBills;
 
   // Purchase bills for active customer (Purchase details that appear in Account Details)
   const customerPurchaseDetails = React.useMemo(() => {
@@ -1398,12 +1417,6 @@ const PurchaseEntry = () => {
       : ((activeCustomer?.credit || 0) - (activeCustomer?.debit || 0)))
     : 0;
 
-  const isCurrentCustomerNew = activeCustomer
-    ? ((activeCustomer?.debit || 0) === 0 &&
-      (activeCustomer?.credit || 0) === 0 &&
-      (!customerPerformoBills || customerPerformoBills.length === 0))
-    : true;
-
   // New advance amount entered in this order
   const newlyEnteredAdvance = customerAdvanceInput !== '' ? (parseFloat(customerAdvanceInput) || 0) : 0;
 
@@ -1412,9 +1425,11 @@ const PurchaseEntry = () => {
   const remainingAdvance = totalEffectiveAdvance;
 
   // ── Customer Pending Cases to Send List ──
-  // Extracts remaining cases (caseRequired > caseOut) from all previous confirmed bills for activeCustomer
+  // Extracts remaining cases (caseRequired > caseOut) from previous confirmed bills for activeCustomer
   const customerPendingCasesList = React.useMemo(() => {
-    if (!activeCustomer) return [];
+    if (!activeCustomer || !hasPreviousBills || !customerPerformoBills || customerPerformoBills.length === 0) {
+      return [];
+    }
 
     const pendingList = [];
     customerPerformoBills.forEach((bill) => {
@@ -1446,11 +1461,12 @@ const PurchaseEntry = () => {
     });
 
     return pendingList;
-  }, [customerPerformoBills, activeCustomer]);
+  }, [customerPerformoBills, activeCustomer, hasPreviousBills]);
 
   const totalPendingCasesToSend = React.useMemo(() => {
+    if (!hasPreviousBills) return 0;
     return customerPendingCasesList.reduce((sum, item) => sum + (item.pendingCases || 0), 0);
-  }, [customerPendingCasesList]);
+  }, [customerPendingCasesList, hasPreviousBills]);
 
 
   // Handler to load all pending cases into current requirement order
@@ -1669,14 +1685,19 @@ const PurchaseEntry = () => {
         return;
       }
 
-      const targetCustomerName =
-        activeCustomer
-          ? activeCustomer.name
-          : (step2Customer || 'General Customer');
-
+      const targetCustomerName = activeCustomer ? activeCustomer.name : step2Customer;
       const targetCustomerId = activeCustomer
-        ? (activeCustomer.id || activeCustomer.customId)
-        : (customersList.find((c) => c.name === targetCustomerName)?.id || 'CUST-GEN');
+        ? (activeCustomer.customId || activeCustomer.id || activeCustomer.mongoId)
+        : (customersList.find((c) => c.name?.toLowerCase() === targetCustomerName?.toLowerCase())?.customId || '');
+
+      if (!targetCustomerName || targetCustomerName.toLowerCase() === 'general customer' || !targetCustomerId) {
+        alert('Please select a valid customer account before confirming the bill.');
+        setFeedback({
+          type: 'error',
+          message: 'A valid customer account is required to generate a bill.',
+        });
+        return;
+      }
 
       // 1. Update customer debit & credit balance
       if (activeCustomer) {
@@ -2257,7 +2278,7 @@ const PurchaseEntry = () => {
           </section>
 
           {/* ── OLD CUSTOMER REMAINING CASES TO SEND CARD ── */}
-          {activeCustomer && !isCurrentCustomerNew && totalPendingCasesToSend > 0 && (
+          {activeCustomer && hasPreviousBills && totalPendingCasesToSend > 0 && (
             <section className="bg-gradient-to-r from-amber-50 via-orange-50/40 to-amber-50 border-2 border-amber-300 rounded-2xl p-5 shadow-xs space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-200 pb-3">
                 <div className="flex items-center gap-3">
@@ -2746,7 +2767,7 @@ const PurchaseEntry = () => {
           </div>
 
           {/* Pending Cases Notification Banner in Tab 2 */}
-          {activeCustomer && !isCurrentCustomerNew && totalPendingCasesToSend > 0 && (
+          {activeCustomer && hasPreviousBills && totalPendingCasesToSend > 0 && (
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300 rounded-xl text-xs text-amber-900 shadow-2xs">
               <div className="flex items-center gap-2.5">
                 <Truck size={18} className="text-amber-600 shrink-0" />
@@ -3270,7 +3291,7 @@ const PurchaseEntry = () => {
                 <span className="text-slate-500">Phone: <strong className="text-slate-800">{activeCustomer.phone}</strong></span>
                 <span className="text-slate-300">•</span>
                 <span className="text-slate-500">Current Balance: <strong className={customerPreviousRemaining < 0 ? 'text-rose-600' : 'text-emerald-700'}>{formatCurrency(customerPreviousRemaining)}</strong></span>
-                {totalPendingCasesToSend > 0 && (
+                {hasPreviousBills && totalPendingCasesToSend > 0 && (
                   <>
                     <span className="text-slate-300">•</span>
                     <span className="text-amber-800 font-bold bg-amber-100 border border-amber-300 px-2.5 py-0.5 rounded-full flex items-center gap-1">
@@ -3294,7 +3315,7 @@ const PurchaseEntry = () => {
           ) : (
             <>
               {/* If customer has remaining cases to send, display pending breakdown */}
-              {totalPendingCasesToSend > 0 && (
+              {hasPreviousBills && totalPendingCasesToSend > 0 && (
                 <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300 rounded-xl p-4 space-y-3">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <div className="flex items-center gap-2">

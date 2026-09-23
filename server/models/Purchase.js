@@ -5,6 +5,7 @@ const purchaseItemSchema = new mongoose.Schema({
   particular: { type: String },
   productName: { type: String },
   brand: { type: String },
+  companyName: { type: String },
   caseRequired: { type: Number, default: 0 },
   caseOut: { type: Number, default: 0 },
   caseCount: { type: Number, default: 0 },
@@ -59,6 +60,18 @@ const purchaseSchema = new mongoose.Schema(
       default: 0,
     },
     netTotal: {
+      type: Number,
+      default: 0,
+    },
+    previousRemaining: {
+      type: Number,
+      default: 0,
+    },
+    newAdvancePaid: {
+      type: Number,
+      default: 0,
+    },
+    totalAvailableAdvance: {
       type: Number,
       default: 0,
     },

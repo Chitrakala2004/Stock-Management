@@ -118,10 +118,12 @@ export const StockProvider = ({ children }) => {
         saveCache('brands', formatted);
       }
       if (purRes.data && purRes.data.length > 0) {
-        const formatted = purRes.data.map(p => ({
-          ...p,
-          id: p.id || p._id || p.purchaseId,
-        }));
+        const formatted = purRes.data
+          .filter(p => (p.customerName || p.customer || '').toLowerCase() !== 'general customer')
+          .map(p => ({
+            ...p,
+            id: p.id || p._id || p.purchaseId,
+          }));
         setPurchases(formatted);
         saveCache('purchases', formatted);
       }
@@ -142,10 +144,12 @@ export const StockProvider = ({ children }) => {
         saveCache('txns', formatted);
       }
       if (dspRes.data && dspRes.data.length > 0) {
-        const formatted = dspRes.data.map(d => ({
-          ...d,
-          id: d.id || d._id,
-        }));
+        const formatted = dspRes.data
+          .filter(d => (d.customerName || '').toLowerCase() !== 'general customer')
+          .map(d => ({
+            ...d,
+            id: d.id || d._id,
+          }));
         setDispatches(formatted);
         saveCache('dispatches', formatted);
       }

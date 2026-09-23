@@ -15,10 +15,58 @@ const getPurchases = async (req, res) => {
 };
 
 const createPurchase = async (req, res) => {
+  const custName = (req.body.customerName || req.body.customer || '').trim();
+  if (!custName || custName.toLowerCase() === 'general customer') {
+    return res.status(400).json({ message: 'A valid customer account is required to create a purchase order.' });
+  }
+
+  // Ensure customerId is present
+  if (!req.body.customerId) {
+    try {
+      const foundCust = await Customer.findOne({ name: new RegExp('^' + custName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') });
+      if (foundCust) {
+        req.body.customerId = foundCust.customId || foundCust._id.toString();
+      }
+    } catch (e) {}
+  }
+
   const debitAmt = parseFloat(req.body.netTotal || req.body.debit || req.body.totalPurchaseAmount) || 0;
   const newAdvance = parseFloat(req.body.newAdvancePaid) || 0;
   try {
     const newPur = await Purchase.create(req.body);
+
+    // Auto-sync products into Product collection if they do not exist
+    if (Array.isArray(req.body.items) && req.body.items.length > 0) {
+      const Product = require('../models/Product');
+      for (const item of req.body.items) {
+        const prodName = (item.particular || item.productName || '').trim();
+        if (prodName) {
+          try {
+            const existingProd = await Product.findOne({
+              name: new RegExp('^' + prodName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i')
+            });
+            if (!existingProd) {
+              await Product.create({
+                name: prodName,
+                brand: item.brand || item.companyName || req.body.companyName || 'SIMBA FW',
+                companyName: item.companyName || item.brand || req.body.companyName || 'SIMBA FW',
+                pricePerPiece: parseFloat(item.rate) || 10,
+                rate: parseFloat(item.rate) || 10,
+                piecesPerCase: parseInt(item.pktUnits, 10) || 10,
+                pktUnits: parseInt(item.pktUnits, 10) || 10,
+                availableCases: 50,
+                cases: 50,
+                category: 'General Crackers',
+              });
+              console.log(`✨ Auto-created product in DB from purchase: ${prodName}`);
+            }
+          } catch (pErr) {
+            console.warn('Product auto-sync warning:', pErr.message);
+          }
+        }
+      }
+    }
+
     const update = {};
     if (debitAmt > 0) update.$inc = { debit: debitAmt };
     if (newAdvance > 0) {
