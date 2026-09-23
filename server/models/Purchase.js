@@ -25,6 +25,10 @@ const purchaseSchema = new mongoose.Schema(
     billNo: {
       type: String,
     },
+    customerId: {
+      type: String,
+      trim: true,
+    },
     customer: {
       type: String,
     },

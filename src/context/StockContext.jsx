@@ -82,10 +82,19 @@ export const StockProvider = ({ children }) => {
       ]);
 
       if (custRes.data && custRes.data.length > 0) {
-        const formatted = custRes.data.map(c => ({
-          ...c,
-          id: c.customId || c.id || c._id,
-        }));
+        const seen = new Set();
+        const formatted = [];
+        for (const c of custRes.data) {
+          const cid = c.customId || c.id || c._id;
+          if (cid && !seen.has(cid)) {
+            seen.add(cid);
+            formatted.push({
+              ...c,
+              id: cid,
+              customId: c.customId || cid,
+            });
+          }
+        }
         setCustomers(formatted);
         saveCache('customers', formatted);
       }
@@ -349,12 +358,25 @@ export const StockProvider = ({ children }) => {
 
   // Customer Management
   const addCustomer = async (customerData) => {
+    const trimmedName = (customerData.name || '').trim().toUpperCase();
+    const trimmedPhone = (customerData.phone || '').trim();
+
+    // Check if customer with same name and phone or customId already exists in local state
+    const existing = customers.find(
+      (c) =>
+        (customerData.customId && (c.customId === customerData.customId || c.id === customerData.customId)) ||
+        (trimmedName && trimmedPhone && c.name?.toUpperCase() === trimmedName && c.phone === trimmedPhone)
+    );
+    if (existing) {
+      return existing;
+    }
+
     const nextCustomId = customerData.customId || getNextCustomerId(customers);
     try {
       const payload = {
         customId: nextCustomId,
-        name: customerData.name,
-        phone: customerData.phone || '',
+        name: trimmedName,
+        phone: trimmedPhone,
         gst: customerData.gst || 'N/A',
         address: customerData.address || '',
         email: customerData.email || '',
@@ -368,10 +390,15 @@ export const StockProvider = ({ children }) => {
         ...saved,
         id: saved.customId || saved.id || saved._id || nextCustomId,
         customId: saved.customId || nextCustomId,
+        name: saved.name || trimmedName,
       };
       setCustomers((prev) => [
         formatted,
-        ...prev.filter((c) => (c.customId || c.id || c._id) !== formatted.id),
+        ...prev.filter(
+          (c) =>
+            (c.customId || c.id || c._id) !== formatted.id &&
+            (c.name?.toUpperCase() !== formatted.name?.toUpperCase() || c.phone !== formatted.phone)
+        ),
       ]);
       return formatted;
     } catch (err) {
@@ -381,11 +408,17 @@ export const StockProvider = ({ children }) => {
         customId: nextCustomId,
         _id: nextCustomId,
         ...customerData,
+        name: trimmedName,
+        phone: trimmedPhone,
         createdAt: new Date().toISOString().split('T')[0],
       };
       setCustomers((prev) => [
         fallbackCust,
-        ...prev.filter((c) => (c.customId || c.id || c._id) !== fallbackCust.id),
+        ...prev.filter(
+          (c) =>
+            (c.customId || c.id || c._id) !== fallbackCust.id &&
+            (c.name?.toUpperCase() !== fallbackCust.name?.toUpperCase() || c.phone !== fallbackCust.phone)
+        ),
       ]);
       return fallbackCust;
     }
@@ -490,11 +523,26 @@ export const StockProvider = ({ children }) => {
 
   // Customer Financial Calculation Helpers
   const getCustomerTotalAdvance = (customerId) => {
+    if (!customerId) return 0;
     const cust = customers.find((c) => c.id === customerId || c._id === customerId || c.customId === customerId);
+    const targetCustomId = cust?.customId;
+    const targetId = cust?.id;
+    const targetMongoId = cust?._id;
+    const targetName = (cust?.name || '').trim().toLowerCase();
+
     const advanceSum = advancePayments
       .filter((a) => {
-        const matchesId = a.customerId === customerId || (cust && (a.customerId === cust.customId || a.customerId === cust.id || a.customerId === cust._id));
-        const matchesName = cust && a.customerName && a.customerName.toLowerCase() === cust.name.toLowerCase();
+        const aCustId = a.customerId;
+        const aCustName = (a.customerName || '').trim().toLowerCase();
+
+        const matchesId = Boolean(
+          aCustId &&
+          (aCustId === customerId ||
+           (targetCustomId && aCustId === targetCustomId) ||
+           (targetId && aCustId === targetId) ||
+           (targetMongoId && aCustId === targetMongoId))
+        );
+        const matchesName = Boolean(targetName && aCustName && aCustName === targetName);
         return matchesId || matchesName;
       })
       .reduce((sum, a) => sum + (parseFloat(a.amount || a.creditAmt) || 0), 0);
@@ -502,11 +550,26 @@ export const StockProvider = ({ children }) => {
   };
 
   const getCustomerTotalPurchases = (customerId) => {
+    if (!customerId) return 0;
     const cust = customers.find((c) => c.id === customerId || c._id === customerId || c.customId === customerId);
+    const targetCustomId = cust?.customId;
+    const targetId = cust?.id;
+    const targetMongoId = cust?._id;
+    const targetName = (cust?.name || '').trim().toLowerCase();
+
     const purchasesSum = purchases
       .filter((p) => {
-        const matchesId = p.customerId === customerId || (cust && (p.customerId === cust.customId || p.customerId === cust.id || p.customerId === cust._id));
-        const matchesName = cust && ((p.customer && p.customer.toLowerCase() === cust.name.toLowerCase()) || (p.customerName && p.customerName.toLowerCase() === cust.name.toLowerCase()));
+        const pCustId = p.customerId;
+        const pCustName = (p.customerName || p.customer || '').trim().toLowerCase();
+
+        const matchesId = Boolean(
+          pCustId &&
+          (pCustId === customerId ||
+           (targetCustomId && pCustId === targetCustomId) ||
+           (targetId && pCustId === targetId) ||
+           (targetMongoId && pCustId === targetMongoId))
+        );
+        const matchesName = Boolean(targetName && pCustName && pCustName === targetName);
         return (matchesId || matchesName) && (p.status === 'Confirmed' || !p.status);
       })
       .reduce((sum, p) => sum + (parseFloat(p.totalPurchaseAmount || p.netTotal || p.debit) || 0), 0);

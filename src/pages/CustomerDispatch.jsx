@@ -48,13 +48,18 @@ const CustomerDispatch = () => {
     }
   }, [customers, selectedCustomerId]);
 
-  // Extract customer saved products from confirmed purchases
-  const customerPurchases = purchases.filter(
-    (p) =>
-      p.customerId === (activeCustomer?.customId || activeCustomer?.id) ||
-      p.customer === activeCustomer?.name ||
-      p.customerName === activeCustomer?.name
-  );
+  // Extract customer saved products from confirmed purchases (strictly null-safe match)
+  const customerPurchases = purchases.filter((p) => {
+    if (!activeCustomer) return false;
+    const custId = activeCustomer.customId || activeCustomer.id;
+    const custName = (activeCustomer.name || '').trim().toLowerCase();
+    const pCustId = p.customerId;
+    const pCustName = (p.customerName || p.customer || '').trim().toLowerCase();
+
+    const idMatches = Boolean(custId && pCustId && (pCustId === custId || (activeCustomer.id && pCustId === activeCustomer.id)));
+    const nameMatches = Boolean(custName && pCustName && pCustName === custName);
+    return idMatches || nameMatches;
+  });
 
   // Aggregate customer items with totalCase, dispatchedCase, pendingCase
   const [customerProducts, setCustomerProducts] = useState([]);

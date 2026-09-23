@@ -54,31 +54,44 @@ const Customers = () => {
 
   useEffect(() => {
     if (contextCustomers && contextCustomers.length > 0) {
-      setCustomers(
-        contextCustomers.map((c) => ({
-          id: c.customId || c.id || c._id,
-          name: c.name,
-          phone: c.phone || 'N/A',
-          gst: c.gst || 'N/A',
-          address: c.address || 'N/A',
-          debit: getCustomerTotalPurchases ? getCustomerTotalPurchases(c.id || c.customId) : (c.debit || 0),
-          credit: getCustomerTotalAdvance ? getCustomerTotalAdvance(c.id || c.customId) : (c.credit || 0),
-          email: c.email || '',
-        }))
-      );
+      const seen = new Set();
+      const unique = [];
+      for (const c of contextCustomers) {
+        const key = c.customId || c.id || c._id;
+        if (key && !seen.has(key)) {
+          seen.add(key);
+          unique.push({
+            id: key,
+            customId: c.customId || key,
+            name: c.name,
+            phone: c.phone || 'N/A',
+            gst: c.gst || 'N/A',
+            address: c.address || 'N/A',
+            debit: getCustomerTotalPurchases ? getCustomerTotalPurchases(c.id || c.customId) : (c.debit || 0),
+            credit: getCustomerTotalAdvance ? getCustomerTotalAdvance(c.id || c.customId) : (c.credit || 0),
+            email: c.email || '',
+          });
+        }
+      }
+      setCustomers(unique);
     }
   }, [contextCustomers, contextPurchases, contextAdvances]);
 
   const getCustomerTransactionsList = (cust) => {
     if (!cust) return [];
     const targetId = cust.customId || cust.id || cust._id;
-    const targetName = (cust.name || '').toLowerCase();
+    const targetName = (cust.name || '').trim().toLowerCase();
 
-    // 1. Advances / Credits from context
+    // 1. Advances / Credits from context (strict null-safe match)
     const advances = (contextAdvances || [])
       .filter((a) => {
-        const idMatch = a.customerId === targetId || a.customerId === cust.id || a.customerId === cust._id;
-        const nameMatch = a.customerName && a.customerName.toLowerCase() === targetName;
+        const aCustId = a.customerId;
+        const aCustName = (a.customerName || '').trim().toLowerCase();
+        const idMatch = Boolean(
+          aCustId &&
+          (aCustId === targetId || aCustId === cust.id || aCustId === cust._id || aCustId === cust.customId)
+        );
+        const nameMatch = Boolean(targetName && aCustName && aCustName === targetName);
         return idMatch || nameMatch;
       })
       .map((a) => ({
@@ -89,13 +102,16 @@ const Customers = () => {
         amount: parseFloat(a.amount || a.creditAmt) || 0,
       }));
 
-    // 2. Purchases / Debits from context
+    // 2. Purchases / Debits from context (strict null-safe match)
     const customerPurchases = (contextPurchases || [])
       .filter((p) => {
-        const idMatch = p.customerId === targetId || p.customerId === cust.id || p.customerId === cust._id;
-        const nameMatch =
-          (p.customerName && p.customerName.toLowerCase() === targetName) ||
-          (p.customer && p.customer.toLowerCase() === targetName);
+        const pCustId = p.customerId;
+        const pCustName = (p.customerName || p.customer || '').trim().toLowerCase();
+        const idMatch = Boolean(
+          pCustId &&
+          (pCustId === targetId || pCustId === cust.id || pCustId === cust._id || pCustId === cust.customId)
+        );
+        const nameMatch = Boolean(targetName && pCustName && pCustName === targetName);
         return idMatch || nameMatch;
       })
       .map((p) => ({
@@ -169,73 +185,80 @@ const Customers = () => {
     ? getNextCustomerId(customers)
     : `CUST-${101 + customers.length}`;
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   // Add Customer Submit (Saves to MongoDB Atlas)
   const handleAddCustomer = async (e) => {
     e.preventDefault();
-    if (!formData.name || !formData.phone) return;
+    if (!formData.name || !formData.phone || isSubmitting) return;
 
-    const debitVal = parseFloat(formData.debit) || 0;
-    const creditVal = parseFloat(formData.credit) || 0;
+    setIsSubmitting(true);
+    try {
+      const debitVal = parseFloat(formData.debit) || 0;
+      const creditVal = parseFloat(formData.credit) || 0;
 
-    const assignedId = assignedCustomerId;
+      const assignedId = assignedCustomerId;
 
-    const newCustPayload = {
-      customId: assignedId,
-      name: formData.name.toUpperCase(),
-      gst: formData.gst ? formData.gst.toUpperCase() : 'N/A',
-      address: formData.address ? formData.address.toUpperCase() : 'N/A',
-      phone: formData.phone,
-      email: formData.email || '',
-      debit: debitVal,
-      credit: creditVal,
-    };
+      const newCustPayload = {
+        customId: assignedId,
+        name: formData.name.toUpperCase(),
+        gst: formData.gst ? formData.gst.toUpperCase() : 'N/A',
+        address: formData.address ? formData.address.toUpperCase() : 'N/A',
+        phone: formData.phone,
+        email: formData.email || '',
+        debit: debitVal,
+        credit: creditVal,
+      };
 
-    let savedCust;
-    if (addCustomer) {
-      savedCust = await addCustomer(newCustPayload);
-    } else {
-      savedCust = { id: assignedId, customId: assignedId, ...newCustPayload };
-      setCustomers((prev) => [savedCust, ...prev]);
+      let savedCust;
+      if (addCustomer) {
+        savedCust = await addCustomer(newCustPayload);
+      } else {
+        savedCust = { id: assignedId, customId: assignedId, ...newCustPayload };
+        setCustomers((prev) => [savedCust, ...prev]);
+      }
+
+      if (creditVal > 0 && addAdvancePayment && savedCust) {
+        await addAdvancePayment({
+          customerId: savedCust.id || savedCust.customId || savedCust._id,
+          customerName: savedCust.name,
+          amount: creditVal,
+          date: new Date().toISOString().split('T')[0],
+          paymentReference: `PAY-${Math.floor(1000 + Math.random() * 9000)}`,
+          paymentMethod: 'Cash',
+        });
+      }
+
+      const initialTx = [];
+      if (debitVal > 0) {
+        initialTx.push({
+          date: new Date().toISOString().split('T')[0],
+          ref: `INV-${Math.floor(1000 + Math.random() * 9000)}`,
+          desc: 'Opening Purchases / Debit',
+          type: 'debit',
+          amount: debitVal,
+        });
+      }
+      if (creditVal > 0) {
+        initialTx.push({
+          date: new Date().toISOString().split('T')[0],
+          ref: `PAY-${Math.floor(1000 + Math.random() * 9000)}`,
+          desc: 'Opening Payment / Credit',
+          type: 'credit',
+          amount: creditVal,
+        });
+      }
+
+      if (initialTx.length > 0 && savedCust) {
+        const targetId = savedCust.id || savedCust.customId || savedCust._id;
+        saveManualTransactions({ ...transactions, [targetId]: initialTx });
+      }
+
+      setFormData({ name: '', gst: '', address: '', phone: '', email: '', debit: '', credit: '' });
+      setIsAddModalOpen(false);
+    } finally {
+      setIsSubmitting(false);
     }
-
-    if (creditVal > 0 && addAdvancePayment && savedCust) {
-      await addAdvancePayment({
-        customerId: savedCust.id || savedCust.customId || savedCust._id,
-        customerName: savedCust.name,
-        amount: creditVal,
-        date: new Date().toISOString().split('T')[0],
-        paymentReference: `PAY-${Math.floor(1000 + Math.random() * 9000)}`,
-        paymentMethod: 'Cash',
-      });
-    }
-
-    const initialTx = [];
-    if (debitVal > 0) {
-      initialTx.push({
-        date: new Date().toISOString().split('T')[0],
-        ref: `INV-${Math.floor(1000 + Math.random() * 9000)}`,
-        desc: 'Opening Purchases / Debit',
-        type: 'debit',
-        amount: debitVal,
-      });
-    }
-    if (creditVal > 0) {
-      initialTx.push({
-        date: new Date().toISOString().split('T')[0],
-        ref: `PAY-${Math.floor(1000 + Math.random() * 9000)}`,
-        desc: 'Opening Payment / Credit',
-        type: 'credit',
-        amount: creditVal,
-      });
-    }
-
-    if (initialTx.length > 0 && savedCust) {
-      const targetId = savedCust.id || savedCust.customId || savedCust._id;
-      saveManualTransactions({ ...transactions, [targetId]: initialTx });
-    }
-
-    setFormData({ name: '', gst: '', address: '', phone: '', email: '', debit: '', credit: '' });
-    setIsAddModalOpen(false);
   };
 
   // Open Edit Customer Modal
@@ -697,9 +720,10 @@ const Customers = () => {
               </button>
               <button
                 type="submit"
-                className="px-6 py-2.5 bg-blue-600 text-white font-semibold text-sm rounded-xl hover:bg-blue-700 transition-all shadow-sm cursor-pointer"
+                disabled={isSubmitting}
+                className="px-6 py-2.5 bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-sm rounded-xl hover:bg-blue-700 transition-all shadow-sm cursor-pointer"
               >
-                Save Customer
+                {isSubmitting ? 'Saving...' : 'Save Customer'}
               </button>
             </div>
           </form>

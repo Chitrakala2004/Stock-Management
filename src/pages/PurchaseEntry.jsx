@@ -243,6 +243,7 @@ const PurchaseEntry = () => {
 
   // Quick Add Customer Modal State inside Performo
   const [isAddCustomerModalOpen, setIsAddCustomerModalOpen] = useState(false);
+  const [isAddingCustomer, setIsAddingCustomer] = useState(false);
   const [newCustomerForm, setNewCustomerForm] = useState({
     name: '',
     phone: '',
@@ -253,61 +254,92 @@ const PurchaseEntry = () => {
 
   const handleQuickAddCustomer = async (e) => {
     e.preventDefault();
-    if (!newCustomerForm.name.trim() || !newCustomerForm.phone.trim()) {
-      alert('Please enter customer Name and Phone Number.');
+    if (!newCustomerForm.name.trim() || !newCustomerForm.phone.trim() || isAddingCustomer) {
+      if (!newCustomerForm.name.trim() || !newCustomerForm.phone.trim()) {
+        alert('Please enter customer Name and Phone Number.');
+      }
       return;
     }
 
-    const assignedId = getNextCustomerId
-      ? getNextCustomerId(customersList)
-      : `CUST-${101 + customersList.length}`;
+    setIsAddingCustomer(true);
+    try {
+      const assignedId = getNextCustomerId
+        ? getNextCustomerId(customersList)
+        : `CUST-${101 + customersList.length}`;
 
-    const initAdv = parseFloat(newCustomerForm.advanceAmount) || 0;
-    const payload = {
-      customId: assignedId,
-      name: newCustomerForm.name.trim().toUpperCase(),
-      phone: newCustomerForm.phone.trim(),
-      gst: newCustomerForm.gst ? newCustomerForm.gst.trim().toUpperCase() : 'N/A',
-      address: newCustomerForm.address ? newCustomerForm.address.trim().toUpperCase() : 'N/A',
-      credit: initAdv,
-      debit: 0,
-    };
+      const initAdv = parseFloat(newCustomerForm.advanceAmount) || 0;
+      const payload = {
+        customId: assignedId,
+        name: newCustomerForm.name.trim().toUpperCase(),
+        phone: newCustomerForm.phone.trim(),
+        gst: newCustomerForm.gst ? newCustomerForm.gst.trim().toUpperCase() : 'N/A',
+        address: newCustomerForm.address ? newCustomerForm.address.trim().toUpperCase() : 'N/A',
+        credit: initAdv,
+        debit: 0,
+      };
 
-    let created;
-    if (addCustomer) {
-      created = await addCustomer(payload);
-    }
+      let created;
+      if (addCustomer) {
+        created = await addCustomer(payload);
+      }
 
-    const createdId = created?.customId || created?.id || created?._id || assignedId;
+      const createdId = created?.customId || created?.id || created?._id || assignedId;
 
-    if (initAdv > 0 && addAdvancePayment && created) {
-      await addAdvancePayment({
-        customerId: createdId,
-        customerName: payload.name,
-        amount: initAdv,
-        date: purchaseDate || new Date().toISOString().split('T')[0],
-        paymentReference: `PAY-${Math.floor(1000 + Math.random() * 9000)}`,
-        paymentMethod: 'Cash',
+      if (initAdv > 0 && addAdvancePayment && created) {
+        await addAdvancePayment({
+          customerId: createdId,
+          customerName: payload.name,
+          amount: initAdv,
+          date: purchaseDate || new Date().toISOString().split('T')[0],
+          paymentReference: `PAY-${Math.floor(1000 + Math.random() * 9000)}`,
+          paymentMethod: 'Cash',
+        });
+      }
+
+      // Immediately add to local customersList so activeCustomer is immediately valid
+      const newCustRecord = {
+        id: createdId,
+        customId: createdId,
+        mongoId: created?._id || created?.id || createdId,
+        name: payload.name,
+        phone: payload.phone,
+        gst: payload.gst,
+        address: payload.address,
+        debit: 0,
+        credit: initAdv,
+      };
+      setCustomersList((prev) => [newCustRecord, ...prev.filter((c) => c.id !== createdId)]);
+
+      setSelectedCustomerId(createdId);
+      setStep2Customer(payload.name);
+      setCustomerAdvanceInput(initAdv ? initAdv.toString() : '0');
+
+      // Reset draft order rows for new customer
+      setProductRows([]);
+      setAddedRequiredProducts([]);
+      setReqEntryProduct('');
+      setReqEntryCases('');
+      setEntryParticular('');
+      setEntryCase('');
+      setEntryRate('');
+      setEntryPktUnits('');
+
+      setNewCustomerForm({
+        name: '',
+        phone: '',
+        gst: '',
+        address: '',
+        advanceAmount: '0',
       });
+      setIsAddCustomerModalOpen(false);
+
+      setFeedback({
+        type: 'success',
+        message: `Customer "${payload.name}" added successfully and selected!`,
+      });
+    } finally {
+      setIsAddingCustomer(false);
     }
-
-    setSelectedCustomerId(createdId);
-    setStep2Customer(payload.name);
-    setCustomerAdvanceInput(initAdv ? initAdv.toString() : '0');
-
-    setNewCustomerForm({
-      name: '',
-      phone: '',
-      gst: '',
-      address: '',
-      advanceAmount: '0',
-    });
-    setIsAddCustomerModalOpen(false);
-
-    setFeedback({
-      type: 'success',
-      message: `Customer "${payload.name}" added successfully and selected!`,
-    });
   };
 
   // Step 2 Item Entry Row State
@@ -1285,17 +1317,32 @@ const PurchaseEntry = () => {
   // Formula: Product amount = Total Units × Rate (e.g. 50 × ₹20 = ₹1,000.00)
   const calculatedEntryAmount = (pktUnitsVal > 0 ? totalUnitsCalculated : casesVal) * rateVal;
 
-  // Filter Performo bills for active customer
+  // Strict Null-Safe Customer Matcher (Guarantees no undefined === undefined cross-matching)
+  const isMatchCustomer = (record, cust) => {
+    if (!record || !cust) return false;
+    const custId = cust.customId || cust.id;
+    const custMongoId = cust.mongoId || cust._id;
+    const custName = (cust.name || '').trim().toLowerCase();
+
+    const recCustId = record.customerId;
+    const recCustName = (record.customerName || record.customer || '').trim().toLowerCase();
+
+    const idMatches = Boolean(
+      recCustId &&
+      (recCustId === custId ||
+       recCustId === custMongoId ||
+       (cust.id && recCustId === cust.id) ||
+       (cust.customId && recCustId === cust.customId))
+    );
+    const nameMatches = Boolean(custName && recCustName && custName === recCustName);
+
+    return idMatches || nameMatches;
+  };
+
+  // Filter Performo bills strictly for active customer
   const customerPerformoBills = React.useMemo(() => {
     if (!activeCustomer) return [];
-    return performoBills.filter(
-      (b) =>
-        b.customerId === activeCustomer.id ||
-        b.customerId === activeCustomer._id ||
-        b.customerId === activeCustomer.customId ||
-        b.customer?.toLowerCase() === activeCustomer.name?.toLowerCase() ||
-        b.customerName?.toLowerCase() === activeCustomer.name?.toLowerCase()
-    );
+    return performoBills.filter((b) => isMatchCustomer(b, activeCustomer));
   }, [performoBills, activeCustomer]);
 
   // Purchase bills for active customer (Purchase details that appear in Account Details)
@@ -1315,13 +1362,8 @@ const PurchaseEntry = () => {
     }));
   }, [customerPerformoBills, activeCustomer]);
 
-  // Filter transactions for active customer
-  const customerTransactionsList = transactions.filter(
-    (t) =>
-      t.customerId === activeCustomer?.id ||
-      t.customerId === activeCustomer?.customId ||
-      t.customerName?.toLowerCase() === activeCustomer?.name?.toLowerCase()
-  );
+  // Filter transactions strictly for active customer
+  const customerTransactionsList = transactions.filter((t) => isMatchCustomer(t, activeCustomer));
 
   // Start fresh next order for the active customer with incremented bill number
   const handleStartNextOrder = () => {
@@ -2028,6 +2070,18 @@ const PurchaseEntry = () => {
                     } else {
                       setStep2Customer('');
                     }
+                    // Reset order items and draft inputs when customer changes
+                    setProductRows([]);
+                    setAddedRequiredProducts([]);
+                    setReqEntryProduct('');
+                    setReqEntryCases('');
+                    setEntryParticular('');
+                    setEntryCase('');
+                    setEntryRate('');
+                    setEntryPktUnits('');
+                    setStep2Discount('');
+                    setStep2Packing('');
+                    setStep2Tax('');
                     setCustomerAdvanceInput('');
                     setFeedback(null);
                     setCreditFeedback(null);
@@ -2692,7 +2746,7 @@ const PurchaseEntry = () => {
           </div>
 
           {/* Pending Cases Notification Banner in Tab 2 */}
-          {activeCustomer && totalPendingCasesToSend > 0 && (
+          {activeCustomer && !isCurrentCustomerNew && totalPendingCasesToSend > 0 && (
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300 rounded-xl text-xs text-amber-900 shadow-2xs">
               <div className="flex items-center gap-2.5">
                 <Truck size={18} className="text-amber-600 shrink-0" />
@@ -3193,6 +3247,12 @@ const PurchaseEntry = () => {
                   } else {
                     setStep2Customer('');
                   }
+                  // Reset draft order rows when customer changes
+                  setProductRows([]);
+                  setAddedRequiredProducts([]);
+                  setReqEntryProduct('');
+                  setReqEntryCases('');
+                  setCustomerAdvanceInput('');
                 }}
                 className="w-full max-w-sm px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-2xs"
               >
@@ -3395,6 +3455,12 @@ const PurchaseEntry = () => {
                   } else {
                     setStep2Customer('');
                   }
+                  // Reset draft order rows when customer changes
+                  setProductRows([]);
+                  setAddedRequiredProducts([]);
+                  setReqEntryProduct('');
+                  setReqEntryCases('');
+                  setCustomerAdvanceInput('');
                 }}
                 className="w-full max-w-sm px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-2xs"
               >
@@ -3658,9 +3724,10 @@ const PurchaseEntry = () => {
             </button>
             <button
               type="submit"
-              className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer"
+              disabled={isAddingCustomer}
+              className="px-5 py-2.5 bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer"
             >
-              Save Customer & Select
+              {isAddingCustomer ? 'Saving...' : 'Save Customer & Select'}
             </button>
           </div>
         </form>

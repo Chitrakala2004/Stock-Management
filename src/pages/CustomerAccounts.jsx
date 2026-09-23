@@ -85,11 +85,25 @@ const CustomerAccounts = () => {
   );
 
   const activeCustomerAdvances = selectedCustomer
-    ? advancePayments.filter((a) => a.customerId === selectedCustomer.id)
+    ? advancePayments.filter((a) => {
+        const custId = selectedCustomer.id || selectedCustomer.customId;
+        const custName = (selectedCustomer.name || '').trim().toLowerCase();
+        const aCustName = (a.customerName || '').trim().toLowerCase();
+        const idMatches = Boolean(custId && a.customerId && (a.customerId === custId || a.customerId === selectedCustomer.id || a.customerId === selectedCustomer.customId));
+        const nameMatches = Boolean(custName && aCustName && aCustName === custName);
+        return idMatches || nameMatches;
+      })
     : [];
 
   const activeCustomerPurchases = selectedCustomer
-    ? purchases.filter((p) => p.customerId === selectedCustomer.id && p.status === 'Confirmed')
+    ? purchases.filter((p) => {
+        const custId = selectedCustomer.id || selectedCustomer.customId;
+        const custName = (selectedCustomer.name || '').trim().toLowerCase();
+        const pCustName = (p.customerName || p.customer || '').trim().toLowerCase();
+        const idMatches = Boolean(custId && p.customerId && (p.customerId === custId || p.customerId === selectedCustomer.id || p.customerId === selectedCustomer.customId));
+        const nameMatches = Boolean(custName && pCustName && pCustName === custName);
+        return (idMatches || nameMatches) && (p.status === 'Confirmed' || !p.status);
+      })
     : [];
 
   return (

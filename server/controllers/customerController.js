@@ -82,32 +82,129 @@ const computeNextCustomerId = async () => {
   return `CUST-${maxNum + 1}`;
 };
 
+// Deduplicate customers in MongoDB (removes duplicate documents with same customId)
+const cleanupDuplicateCustomers = async () => {
+  try {
+    const all = await Customer.find().sort({ createdAt: -1 });
+    const seen = new Set();
+    const toDeleteIds = [];
+    for (const c of all) {
+      const cid = c.customId;
+      if (cid && seen.has(cid)) {
+        toDeleteIds.push(c._id);
+      } else if (cid) {
+        seen.add(cid);
+      }
+    }
+    if (toDeleteIds.length > 0) {
+      await Customer.deleteMany({ _id: { $in: toDeleteIds } });
+      console.log(`Cleaned up ${toDeleteIds.length} duplicate customer records from MongoDB.`);
+    }
+  } catch (e) {
+    // Non-fatal if DB not connected
+  }
+};
+
+// Run duplicate cleanup on load
+setTimeout(cleanupDuplicateCustomers, 1500);
+
 const getCustomers = async (req, res) => {
   try {
     const customers = await Customer.find().sort({ createdAt: -1 });
     if (customers && customers.length > 0) {
-      return res.status(200).json(
-        customers.map((c) => ({
-          ...c.toObject(),
-          id: c.customId || c._id,
-          customId: c.customId || c._id,
-        }))
-      );
+      const seen = new Set();
+      const unique = [];
+      for (const c of customers) {
+        const obj = c.toObject();
+        const key = obj.customId || String(obj._id);
+        if (!seen.has(key)) {
+          seen.add(key);
+          unique.push({
+            ...obj,
+            id: obj.customId || obj._id,
+            customId: obj.customId || obj._id,
+          });
+        }
+      }
+      return res.status(200).json(unique);
     }
-    return res.status(200).json(memoryCustomers);
+    const memSeen = new Set();
+    const uniqueMem = [];
+    for (const c of memoryCustomers) {
+      const key = c.customId || c.id || c._id;
+      if (!memSeen.has(key)) {
+        memSeen.add(key);
+        uniqueMem.push(c);
+      }
+    }
+    return res.status(200).json(uniqueMem);
   } catch (error) {
-    return res.status(200).json(memoryCustomers);
+    const memSeen = new Set();
+    const uniqueMem = [];
+    for (const c of memoryCustomers) {
+      const key = c.customId || c.id || c._id;
+      if (!memSeen.has(key)) {
+        memSeen.add(key);
+        uniqueMem.push(c);
+      }
+    }
+    return res.status(200).json(uniqueMem);
   }
 };
 
 const createCustomer = async (req, res) => {
+  const nameTrimmed = (req.body.name || '').trim();
+  const phoneTrimmed = (req.body.phone || '').trim();
+
+  // 1. Guard against duplicate customer submissions
+  try {
+    const duplicateQuery = [];
+    if (req.body.customId) {
+      duplicateQuery.push({ customId: req.body.customId });
+    }
+    if (nameTrimmed && phoneTrimmed) {
+      duplicateQuery.push({
+        name: { $regex: new RegExp(`^${nameTrimmed.replace(/[-\\/\\\\^$*+?.()|[\\]{}]/g, '\\\\$&')}$`, 'i') },
+        phone: phoneTrimmed,
+      });
+    }
+
+    if (duplicateQuery.length > 0) {
+      const existing = await Customer.findOne({ $or: duplicateQuery });
+      if (existing) {
+        const formatted = {
+          ...existing.toObject(),
+          id: existing.customId || existing._id,
+          customId: existing.customId || existing._id,
+        };
+        return res.status(200).json(formatted);
+      }
+    }
+  } catch (err) {
+    console.warn('Duplicate check warning:', err.message);
+  }
+
+  // Check memory store for duplicate
+  const existingMem = memoryCustomers.find(
+    (c) =>
+      (req.body.customId && (c.customId === req.body.customId || c.id === req.body.customId)) ||
+      (nameTrimmed && phoneTrimmed && c.name?.toLowerCase() === nameTrimmed.toLowerCase() && c.phone === phoneTrimmed)
+  );
+  if (existingMem) {
+    return res.status(200).json(existingMem);
+  }
+
   let customId = req.body.customId;
   if (!customId || !customId.startsWith('CUST-')) {
     customId = await computeNextCustomerId();
   }
 
   try {
-    const newCust = await Customer.create({ ...req.body, customId });
+    const newCust = await Customer.create({
+      ...req.body,
+      name: nameTrimmed.toUpperCase(),
+      customId,
+    });
     const formatted = {
       ...newCust.toObject(),
       id: newCust.customId || newCust._id,
@@ -122,6 +219,7 @@ const createCustomer = async (req, res) => {
       id: customId,
       customId: customId,
       ...req.body,
+      name: nameTrimmed.toUpperCase(),
       status: req.body.status || 'Active',
     };
     memoryCustomers.unshift(newCust);
